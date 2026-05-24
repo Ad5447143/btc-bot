@@ -12,7 +12,7 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
-
+import os
 import requests
 import threading
 import time
@@ -239,4 +239,4 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 app.add_handler(CallbackQueryHandler(button_handler))
 
 print("BOT RUNNING 🚀")
-app.run_polling()
+
