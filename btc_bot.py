@@ -239,4 +239,9 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 app.add_handler(CallbackQueryHandler(button_handler))
 
 print("BOT RUNNING 🚀")
+if __name__ == "__main__":
+    print("BOT RUNNING 🚀")
 
+    app.run_polling(
+        drop_pending_updates=True
+    )
