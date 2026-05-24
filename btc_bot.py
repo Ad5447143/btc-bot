@@ -1,11 +1,5 @@
 from telegram import ReplyKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    filters
-)
-
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 import requests
 import threading
 import time
@@ -17,49 +11,59 @@ import time
 BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 CHAT_ID = "369031827"
 
-SYMBOLS = [
-    "BTCUSDT",
-    "ETHUSDT",
-    "BNBUSDT",
-    "SOLUSDT",
-    "XRPUSDT",
-    "ADAUSDT",
-    "DOGEUSDT",
-    "USDTUSDT"
-]
-
-# =========================
-# تنظیمات سیگنال
-# =========================
-
-THRESHOLD_PERCENT = 2.0          # درصد حرکت
-COOLDOWN_SECONDS = 60            # جلوگیری از اسپم
+# CoinGecko IDs (بدون تحریم)
+COINS = {
+    "BTCUSDT": "bitcoin",
+    "ETHUSDT": "ethereum",
+    "BNBUSDT": "binancecoin",
+    "SOLUSDT": "solana",
+    "XRPUSDT": "ripple",
+    "DOGEUSDT": "dogecoin",
+    "ADAUSDT": "cardano"
+}
 
 price_history = {}
-last_alert_time = {}
+user_targets = {}
+last_alert = {}
 
 # =========================
-# گرفتن قیمت
+# گرفتن قیمت (CoinGecko)
 # =========================
 
 def get_price(symbol):
     try:
-        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-        data = requests.get(url, timeout=10).json()
-        return float(data["price"])
-    except:
+        coin_id = COINS.get(symbol)
+        if not coin_id:
+            return None
+
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {
+            "ids": coin_id,
+            "vs_currencies": "usd"
+        }
+
+        r = requests.get(url, params=params, timeout=10)
+        data = r.json()
+
+        return float(data[coin_id]["usd"])
+
+    except Exception as e:
+        print("PRICE ERROR:", e)
         return None
 
 # =========================
-# تلگرام
+# ارسال پیام تلگرام
 # =========================
 
-def send_telegram_message(text):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": CHAT_ID, "text": text})
+def send_message(text):
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": text})
+    except:
+        pass
 
 # =========================
-# بررسی سیگنال
+# سیگنال
 # =========================
 
 def check_signal(symbol):
@@ -69,56 +73,53 @@ def check_signal(symbol):
 
     now = time.time()
 
-    # ذخیره اولیه
-    if symbol not in price_history:
-        price_history[symbol] = (price, now)
-        return
+    if symbol in price_history:
+        old_price, _ = price_history[symbol]
 
-    old_price, old_time = price_history[symbol]
+        change = ((price - old_price) / old_price) * 100
 
-    change = ((price - old_price) / old_price) * 100
+        # تارگت
+        if symbol in user_targets:
+            if price >= user_targets[symbol]:
+                send_message(f"🎯 TARGET HIT\n{symbol}\nPrice: {price}")
+                del user_targets[symbol]
 
-    # cooldown
-    if symbol in last_alert_time:
-        if now - last_alert_time[symbol] < COOLDOWN_SECONDS:
-            price_history[symbol] = (price, now)
-            return
+        # ضد اسپم
+        if symbol in last_alert:
+            if now - last_alert[symbol] < 60:
+                price_history[symbol] = (price, now)
+                return
 
-    signal = None
+        # سیگنال‌ها
+        if change >= 2:
+            send_message(f"🚀 PUMP {symbol}\n{change:.2f}%\nPrice: {price}")
+            last_alert[symbol] = now
 
-    if change >= THRESHOLD_PERCENT:
-        signal = f"🚀 PUMP {symbol}"
-    elif change <= -THRESHOLD_PERCENT:
-        signal = f"📉 DUMP {symbol}"
-
-    if signal:
-        send_telegram_message(
-            f"{signal}\n\n"
-            f"💰 Price: {price:.4f}\n"
-            f"📊 Change: {change:.2f}%"
-        )
-        last_alert_time[symbol] = now
+        elif change <= -2:
+            send_message(f"📉 DUMP {symbol}\n{change:.2f}%\nPrice: {price}")
+            last_alert[symbol] = now
 
     price_history[symbol] = (price, now)
 
 # =========================
-# اسکنر بازار
+# اسکنر
 # =========================
 
-def price_checker():
+def scanner():
     while True:
-        for symbol in SYMBOLS:
-            check_signal(symbol)
+        for s in COINS.keys():
+            check_signal(s)
 
-        time.sleep(10)
+        time.sleep(15)
 
 # =========================
 # تلگرام UI
 # =========================
 
 keyboard = [
-    ["💰 قیمت BTC"],
-    ["ℹ️ راهنما"]
+    ["💰 قیمت‌ها"],
+    ["📊 سیگنال"],
+    ["🎯 تارگت"]
 ]
 
 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -129,58 +130,85 @@ reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 async def start(update, context):
     await update.message.reply_text(
-        "🤖 ربات سیگنال فعال شد\n\n"
-        "📊 BTC / ETH / BNB / SOL / XRP / ADA / DOGE\n"
-        "🚀 Pump / Dump detection فعال است",
+        "🤖 ربات فعال شد (نسخه ایران)\n\n"
+        "📊 BTC / ETH / BNB / SOL / XRP / DOGE / ADA\n"
+        "🚀 سیگنال خودکار فعال است",
         reply_markup=reply_markup
     )
 
 # =========================
-# قیمت BTC
+# قیمت همه
 # =========================
 
-async def price(update, context):
-    price = get_price("BTCUSDT")
-    await update.message.reply_text(f"💰 BTC: {price}")
+async def prices(update, context):
+    text = "💰 قیمت‌ها:\n\n"
+
+    for s, cid in COINS.items():
+        p = get_price(s)
+        if p:
+            text += f"{s}: {p}$\n"
+
+    await update.message.reply_text(text)
 
 # =========================
-# راهنما
+# راهنما سیگنال
 # =========================
 
-async def help_command(update, context):
+async def signals(update, context):
     await update.message.reply_text(
-        "📚 راهنما:\n\n"
-        "📊 ربات سیگنال خودکار\n"
-        "🚀 تشخیص Pump / Dump\n"
-        "⏱ هر 10 ثانیه اسکن"
+        "📊 سیستم سیگنال فعال:\n\n"
+        "🚀 Pump / Dump > 2%\n"
+        "⏱ بررسی هر 15 ثانیه\n"
+        "📡 CoinGecko API (بدون تحریم)"
     )
 
 # =========================
-# دکمه‌ها
+# تارگت
 # =========================
 
-async def handle_message(update, context):
+async def target(update, context):
+    try:
+        symbol = context.args[0].upper()
+        price = float(context.args[1])
+
+        user_targets[symbol] = price
+
+        await update.message.reply_text(
+            f"🎯 تارگت ثبت شد\n{symbol} → {price}"
+        )
+
+    except:
+        await update.message.reply_text(
+            "مثال:\n/target BTCUSDT 80000"
+        )
+
+# =========================
+# handler
+# =========================
+
+def handle(update, context):
     text = update.message.text
 
-    if text == "💰 قیمت BTC":
-        price = get_price("BTCUSDT")
-        await update.message.reply_text(f"💰 BTC: {price}")
+    if text == "💰 قیمت‌ها":
+        return prices(update, context)
 
-    elif text == "ℹ️ راهنما":
-        await help_command(update, context)
+    if text == "📊 سیگنال":
+        return signals(update, context)
+
+    if text == "🎯 تارگت":
+        update.message.reply_text("مثال:\n/target BTCUSDT 80000")
 
 # =========================
-# اجرا ربات
+# اجرا
 # =========================
 
 app = Application.builder().token(BOT_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("price", price))
-app.add_handler(CommandHandler("help", help_command))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.add_handler(CommandHandler("target", target))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
-threading.Thread(target=price_checker, daemon=True).start()
+threading.Thread(target=scanner, daemon=True).start()
 
 print("BOT RUNNING 🚀")
 app.run_polling()
