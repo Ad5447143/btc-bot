@@ -12,20 +12,18 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
-import os
+
 import requests
-import threading
-import time
 
 # =========================
 # تنظیمات
 # =========================
 
-BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
+BOT_TOKEN = "YOUR_BOT_TOKEN"
 CHAT_ID = "369031827"
 
 # =========================
-# ارزها (CoinGecko)
+# ارزها
 # =========================
 
 COINS = {
@@ -39,16 +37,11 @@ COINS = {
     "USDT": "tether"
 }
 
-# =========================
-# وضعیت‌ها
-# =========================
-
 price_history = {}
 user_targets = {}
-last_alert = {}
 
 # =========================
-# گرفتن قیمت (بدون تحریم)
+# قیمت
 # =========================
 
 def get_price(symbol):
@@ -57,9 +50,8 @@ def get_price(symbol):
         if not coin_id:
             return None
 
-        url = "https://api.coingecko.com/api/v3/simple/price"
         r = requests.get(
-            url,
+            "https://api.coingecko.com/api/v3/simple/price",
             params={"ids": coin_id, "vs_currencies": "usd"},
             timeout=10
         )
@@ -67,48 +59,32 @@ def get_price(symbol):
 
         return float(data[coin_id]["usd"])
 
-    except Exception as e:
-        print("PRICE ERROR:", e)
+    except:
         return None
 
 # =========================
-# ارسال پیام تلگرام
-# =========================
-
-def send_message(text):
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": CHAT_ID, "text": text})
-    except:
-        pass
-
-# =========================
-# منوی انتخاب ارز
+# UI
 # =========================
 
 def coin_menu():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🟡 BTC", callback_data="coin_BTCUSDT"),
-            InlineKeyboardButton("🔵 ETH", callback_data="coin_ETHUSDT")
+            InlineKeyboardButton("BTC", callback_data="coin_BTCUSDT"),
+            InlineKeyboardButton("ETH", callback_data="coin_ETHUSDT")
         ],
         [
-            InlineKeyboardButton("🟠 BNB", callback_data="coin_BNBUSDT"),
-            InlineKeyboardButton("🟢 SOL", callback_data="coin_SOLUSDT")
+            InlineKeyboardButton("BNB", callback_data="coin_BNBUSDT"),
+            InlineKeyboardButton("SOL", callback_data="coin_SOLUSDT")
         ],
         [
-            InlineKeyboardButton("🔴 XRP", callback_data="coin_XRPUSDT"),
-            InlineKeyboardButton("⚫ DOGE", callback_data="coin_DOGEUSDT")
+            InlineKeyboardButton("XRP", callback_data="coin_XRPUSDT"),
+            InlineKeyboardButton("DOGE", callback_data="coin_DOGEUSDT")
         ],
         [
-            InlineKeyboardButton("🔷 ADA", callback_data="coin_ADAUSDT"),
-            InlineKeyboardButton("⚪ USDT", callback_data="coin_USDT")
+            InlineKeyboardButton("ADA", callback_data="coin_ADAUSDT"),
+            InlineKeyboardButton("USDT", callback_data="coin_USDT")
         ]
     ])
-
-# =========================
-# منوی اصلی
-# =========================
 
 main_keyboard = ReplyKeyboardMarkup(
     [
@@ -125,17 +101,17 @@ main_keyboard = ReplyKeyboardMarkup(
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 ربات سیگنال کریپتو فعال شد\n\n"
-        "📊 انتخاب ارز + سیگنال اختصاصی + تارگت",
+        "🤖 ربات فعال شد\n\n"
+        "📊 سیگنال + قیمت + تارگت",
         reply_markup=main_keyboard
     )
 
 # =========================
-# گرفتن قیمت
+# قیمت‌ها
 # =========================
 
 async def prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = "💰 قیمت ارزها:\n\n"
+    text = "💰 قیمت‌ها:\n\n"
 
     for s in COINS:
         p = get_price(s)
@@ -145,14 +121,11 @@ async def prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text)
 
 # =========================
-# منوی انتخاب ارز برای سیگنال
+# منوی سیگنال
 # =========================
 
 async def signal_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📊 یک ارز برای سیگنال انتخاب کن 👇",
-        reply_markup=coin_menu()
-    )
+    await update.message.reply_text("📊 انتخاب ارز:", reply_markup=coin_menu())
 
 # =========================
 # تارگت
@@ -165,53 +138,46 @@ async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         user_targets[symbol] = price
 
-        await update.message.reply_text(
-            f"🎯 تارگت ثبت شد\n{symbol} → {price}"
-        )
+        await update.message.reply_text(f"🎯 تارگت ثبت شد: {symbol} → {price}")
 
     except:
-        await update.message.reply_text(
-            "مثال:\n/target BTCUSDT 80000"
-        )
+        await update.message.reply_text("مثال:\n/target BTCUSDT 80000")
 
 # =========================
-# کلیک روی ارزها (سیگنال اختصاصی)
+# سیگنال
 # =========================
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    data = query.data
+    symbol = query.data.replace("coin_", "")
 
-    if data.startswith("coin_"):
-        symbol = data.replace("coin_", "")
+    price = get_price(symbol)
+    if not price:
+        await query.edit_message_text("❌ قیمت دریافت نشد")
+        return
 
-        price = get_price(symbol)
+    old = price_history.get(symbol, price)
+    change = ((price - old) / old) * 100 if old else 0
+    price_history[symbol] = price
 
-        # سیگنال ساده بر اساس حرکت فرضی (آپدیت بعدی میشه واقعی‌تر)
-        old = price_history.get(symbol, price)
-        change = ((price - old) / old) * 100 if old else 0
-
-        price_history[symbol] = price
-
+    if change >= 2:
+        signal = "🚀 PUMP"
+    elif change <= -2:
+        signal = "📉 DUMP"
+    else:
         signal = "⚪ NEUTRAL"
-        if change >= 2:
-            signal = "🚀 PUMP"
-        elif change <= -2:
-            signal = "📉 DUMP"
 
-        text = (
-            f"📊 {symbol}\n\n"
-            f"💰 Price: {price}$\n"
-            f"📈 Change: {change:.2f}%\n"
-            f"📡 Signal: {signal}"
-        )
-
-        await query.edit_message_text(text)
+    await query.edit_message_text(
+        f"📊 {symbol}\n\n"
+        f"💰 Price: {price}$\n"
+        f"📈 Change: {change:.2f}%\n"
+        f"📡 Signal: {signal}"
+    )
 
 # =========================
-# پیام‌های متنی
+# دکمه‌ها
 # =========================
 
 def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -227,7 +193,7 @@ def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update.message.reply_text("مثال:\n/target BTCUSDT 80000")
 
 # =========================
-# اجرای ربات
+# اجرا
 # =========================
 
 app = Application.builder().token(BOT_TOKEN).build()
@@ -239,9 +205,6 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 app.add_handler(CallbackQueryHandler(button_handler))
 
 print("BOT RUNNING 🚀")
-if __name__ == "__main__":
-    print("BOT RUNNING 🚀")
 
-    app.run_polling(
-        drop_pending_updates=True
-    )
+if __name__ == "__main__":
+    app.run_polling(drop_pending_updates=True)
