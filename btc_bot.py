@@ -14,7 +14,7 @@ import time
 # تنظیمات ربات
 # =========================
 
-BOT_TOKEN = "توکن_واقعی_ربات_تو"
+BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 
 CHAT_ID = "369031827"
 
