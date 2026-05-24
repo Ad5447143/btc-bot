@@ -1,4 +1,3 @@
-from tradingview_ta import TA_Handler, Interval
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -11,79 +10,51 @@ import requests
 import threading
 import time
 
-# ------------------------
+# =========================
 # تنظیمات ربات
-# ------------------------
+# =========================
 
-BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
+BOT_TOKEN = "توکن_واقعی_ربات_تو"
+
 CHAT_ID = "369031827"
 
-# ------------------------
+# =========================
 # تارگت اولیه
-# ------------------------
+# =========================
 
 TARGET_PRICE = 77000.00
 
-# ------------------------
-# وضعیت آلارم
-# ------------------------
+# =========================
+# وضعیت هشدار
+# =========================
 
 alert_sent = False
 
-# ------------------------
+# =========================
 # گرفتن قیمت BTC
-# ------------------------
+# =========================
 
 def get_btc_price():
+
     try:
+
         url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
 
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
 
         data = response.json()
 
-        price = float(data["price"])
-
-        return price
+        return float(data["price"])
 
     except Exception as e:
-        print("ERROR:", e)
+
+        print("PRICE ERROR:", e)
+
         return None
 
-# ------------------------
-# بررسی قیمت
-# ------------------------
-
-def price_checker():
-    global alert_sent
-    global TARGET_PRICE
-
-    while True:
-        price = get_btc_price()
-
-        if price:
-            print(f"BTC 5m Price = {price:.2f} USDT")
-
-            if price >= TARGET_PRICE and not alert_sent:
-
-                message = (
-                    f"🚨 BTC رسید به تارگت\n\n"
-                    f"💰 Price: {price:.2f} USD\n"
-                    f"🎯 Target: {TARGET_PRICE:.2f}"
-                )
-
-                send_telegram_message(message)
-
-                alert_sent = True
-
-            if price < TARGET_PRICE:
-                alert_sent = False
-
-        time.sleep(120)
-
-# ------------------------
+# =========================
 # ارسال پیام تلگرام
-# ------------------------
+# =========================
 
 def send_telegram_message(text):
 
@@ -95,18 +66,68 @@ def send_telegram_message(text):
     }
 
     try:
+
         requests.post(url, data=data)
 
     except Exception as e:
-        print("Telegram Error:", e)
 
-# ------------------------
-# منوی تلگرام
-# ------------------------
+        print("TELEGRAM ERROR:", e)
+
+# =========================
+# چک کردن قیمت
+# =========================
+
+def price_checker():
+
+    global alert_sent
+    global TARGET_PRICE
+
+    while True:
+
+        try:
+
+            price = get_btc_price()
+
+            if price:
+
+                print(f"BTC Price = {price:.2f} USD")
+
+                # ----------------
+
+                if price >= TARGET_PRICE and not alert_sent:
+
+                    message = (
+                        f"🚨 هشدار بیتکوین\n\n"
+                        f"💰 قیمت فعلی: {price:.2f} USD\n"
+                        f"🎯 تارگت: {TARGET_PRICE:.2f}"
+                    )
+
+                    send_telegram_message(message)
+
+                    alert_sent = True
+
+                # ----------------
+
+                if price < TARGET_PRICE:
+
+                    alert_sent = False
+
+            time.sleep(120)
+
+        except Exception as e:
+
+            print("CHECKER ERROR:", e)
+
+            time.sleep(60)
+
+# =========================
+# منوی فارسی
+# =========================
 
 keyboard = [
-    ["/price", "/target"],
-    ["/help"]
+    ["💰 قیمت بیتکوین"],
+    ["🎯 تنظیم تارگت"],
+    ["ℹ️ راهنما"]
 ]
 
 reply_markup = ReplyKeyboardMarkup(
@@ -114,18 +135,20 @@ reply_markup = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# ------------------------
+# =========================
 # start
-# ------------------------
+# =========================
 
 async def start(update, context):
 
     text = (
-        "🤖 ربات BTC فعال شد\n\n"
-        "دستورات:\n"
-        "/price → قیمت فعلی\n"
-        "/target 77000 → تنظیم تارگت\n"
-        "/help → راهنما"
+        "🤖 سلام!\n"
+        "به ربات هشدار بیتکوین خوش اومدی 🔥\n\n"
+        "📌 امکانات:\n"
+        "• قیمت لحظه‌ای BTC\n"
+        "• هشدار رسیدن به تارگت\n"
+        "• آپدیت خودکار هر 2 دقیقه\n\n"
+        "👇 از منوی زیر استفاده کن"
     )
 
     await update.message.reply_text(
@@ -133,42 +156,38 @@ async def start(update, context):
         reply_markup=reply_markup
     )
 
-# ------------------------
-# help
-# ------------------------
-
-async def help_command(update, context):
-
-    text = (
-        "📌 دستورات ربات:\n\n"
-        "/price\n"
-        "نمایش قیمت فعلی BTC\n\n"
-        "/target 77000\n"
-        "تنظیم تارگت جدید"
-    )
-
-    await update.message.reply_text(text)
-
-# ------------------------
-# price
-# ------------------------
+# =========================
+# قیمت
+# =========================
 
 async def price(update, context):
 
-    btc_price = get_btc_price()
+    try:
 
-    if btc_price:
+        btc_price = get_btc_price()
 
-        text = (
-            f"💰 BTC Price:\n"
-            f"{btc_price:.2f} USD"
+        if btc_price:
+
+            await update.message.reply_text(
+                f"💰 قیمت بیتکوین:\n\n"
+                f"{btc_price:.2f} USD"
+            )
+
+        else:
+
+            await update.message.reply_text(
+                "❌ دریافت قیمت ناموفق بود"
+            )
+
+    except Exception as e:
+
+        await update.message.reply_text(
+            f"ERROR:\n{e}"
         )
 
-        await update.message.reply_text(text)
-
-# ------------------------
-# target
-# ------------------------
+# =========================
+# تنظیم تارگت
+# =========================
 
 async def target(update, context):
 
@@ -178,47 +197,122 @@ async def target(update, context):
 
         TARGET_PRICE = float(context.args[0])
 
-        text = (
+        await update.message.reply_text(
             f"🎯 تارگت روی "
             f"{TARGET_PRICE:.2f} تنظیم شد"
         )
 
-        await update.message.reply_text(text)
-
     except:
 
         await update.message.reply_text(
-            "مثال صحیح:\n/target 77000"
+            "❌ مثال صحیح:\n"
+            "/target 77000"
         )
 
-# ------------------------
+# =========================
+# راهنما
+# =========================
+
+async def help_command(update, context):
+
+    text = (
+        "📚 راهنمای ربات\n\n"
+        "💰 قیمت بیتکوین\n"
+        "نمایش قیمت لحظه‌ای BTC\n\n"
+        "🎯 تنظیم تارگت\n"
+        "مثال:\n"
+        "/target 77000"
+    )
+
+    await update.message.reply_text(text)
+
+# =========================
+# دکمه‌ها
+# =========================
+
+async def handle_message(update, context):
+
+    text = update.message.text
+
+    # --------------------
+
+    if text == "💰 قیمت بیتکوین":
+
+        btc_price = get_btc_price()
+
+        if btc_price:
+
+            await update.message.reply_text(
+                f"💰 قیمت فعلی بیتکوین:\n\n"
+                f"{btc_price:.2f} USD"
+            )
+
+        else:
+
+            await update.message.reply_text(
+                "❌ خطا در دریافت قیمت"
+            )
+
+    # --------------------
+
+    elif text == "🎯 تنظیم تارگت":
+
+        await update.message.reply_text(
+            "📌 مثال:\n"
+            "/target 77000"
+        )
+
+    # --------------------
+
+    elif text == "ℹ️ راهنما":
+
+        await update.message.reply_text(
+            "📚 راهنمای ربات\n\n"
+            "💰 قیمت بیتکوین\n"
+            "نمایش قیمت لحظه‌ای\n\n"
+            "🎯 تنظیم تارگت\n"
+            "مثال:\n"
+            "/target 77000"
+        )
+
+# =========================
 # ساخت اپ
-# ------------------------
+# =========================
 
 app = Application.builder().token(BOT_TOKEN).build()
 
-# ------------------------
+# =========================
 # هندلرها
-# ------------------------
+# =========================
 
 app.add_handler(CommandHandler("start", start))
-
-app.add_handler(CommandHandler("help", help_command))
 
 app.add_handler(CommandHandler("price", price))
 
 app.add_handler(CommandHandler("target", target))
 
-# ------------------------
-# اجرای Thread
-# ------------------------
+app.add_handler(CommandHandler("help", help_command))
 
-threading.Thread(target=price_checker).start()
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_message
+    )
+)
+
+# =========================
+# اجرای Thread
+# =========================
+
+threading.Thread(
+    target=price_checker,
+    daemon=True
+).start()
+
+# =========================
+# اجرای ربات
+# =========================
 
 print("BOT STARTED")
-
-# ------------------------
-# اجرای ربات
-# ------------------------
 
 app.run_polling()
