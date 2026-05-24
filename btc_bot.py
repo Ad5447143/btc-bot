@@ -1,5 +1,18 @@
-from telegram import ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram import (
+    ReplyKeyboardMarkup,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    Update
+)
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters
+)
+
 import requests
 import threading
 import time
@@ -11,7 +24,10 @@ import time
 BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 CHAT_ID = "369031827"
 
-# CoinGecko IDs (بدون تحریم)
+# =========================
+# ارزها (CoinGecko)
+# =========================
+
 COINS = {
     "BTCUSDT": "bitcoin",
     "ETHUSDT": "ethereum",
@@ -19,15 +35,20 @@ COINS = {
     "SOLUSDT": "solana",
     "XRPUSDT": "ripple",
     "DOGEUSDT": "dogecoin",
-    "ADAUSDT": "cardano"
+    "ADAUSDT": "cardano",
+    "USDT": "tether"
 }
+
+# =========================
+# وضعیت‌ها
+# =========================
 
 price_history = {}
 user_targets = {}
 last_alert = {}
 
 # =========================
-# گرفتن قیمت (CoinGecko)
+# گرفتن قیمت (بدون تحریم)
 # =========================
 
 def get_price(symbol):
@@ -37,12 +58,11 @@ def get_price(symbol):
             return None
 
         url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {
-            "ids": coin_id,
-            "vs_currencies": "usd"
-        }
-
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(
+            url,
+            params={"ids": coin_id, "vs_currencies": "usd"},
+            timeout=10
+        )
         data = r.json()
 
         return float(data[coin_id]["usd"])
@@ -63,87 +83,61 @@ def send_message(text):
         pass
 
 # =========================
-# سیگنال
+# منوی انتخاب ارز
 # =========================
 
-def check_signal(symbol):
-    price = get_price(symbol)
-    if price is None:
-        return
-
-    now = time.time()
-
-    if symbol in price_history:
-        old_price, _ = price_history[symbol]
-
-        change = ((price - old_price) / old_price) * 100
-
-        # تارگت
-        if symbol in user_targets:
-            if price >= user_targets[symbol]:
-                send_message(f"🎯 TARGET HIT\n{symbol}\nPrice: {price}")
-                del user_targets[symbol]
-
-        # ضد اسپم
-        if symbol in last_alert:
-            if now - last_alert[symbol] < 60:
-                price_history[symbol] = (price, now)
-                return
-
-        # سیگنال‌ها
-        if change >= 2:
-            send_message(f"🚀 PUMP {symbol}\n{change:.2f}%\nPrice: {price}")
-            last_alert[symbol] = now
-
-        elif change <= -2:
-            send_message(f"📉 DUMP {symbol}\n{change:.2f}%\nPrice: {price}")
-            last_alert[symbol] = now
-
-    price_history[symbol] = (price, now)
+def coin_menu():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🟡 BTC", callback_data="coin_BTCUSDT"),
+            InlineKeyboardButton("🔵 ETH", callback_data="coin_ETHUSDT")
+        ],
+        [
+            InlineKeyboardButton("🟠 BNB", callback_data="coin_BNBUSDT"),
+            InlineKeyboardButton("🟢 SOL", callback_data="coin_SOLUSDT")
+        ],
+        [
+            InlineKeyboardButton("🔴 XRP", callback_data="coin_XRPUSDT"),
+            InlineKeyboardButton("⚫ DOGE", callback_data="coin_DOGEUSDT")
+        ],
+        [
+            InlineKeyboardButton("🔷 ADA", callback_data="coin_ADAUSDT"),
+            InlineKeyboardButton("⚪ USDT", callback_data="coin_USDT")
+        ]
+    ])
 
 # =========================
-# اسکنر
+# منوی اصلی
 # =========================
 
-def scanner():
-    while True:
-        for s in COINS.keys():
-            check_signal(s)
-
-        time.sleep(15)
-
-# =========================
-# تلگرام UI
-# =========================
-
-keyboard = [
-    ["💰 قیمت‌ها"],
-    ["📊 سیگنال"],
-    ["🎯 تارگت"]
-]
-
-reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+main_keyboard = ReplyKeyboardMarkup(
+    [
+        ["💰 قیمت ارزها"],
+        ["📊 سیگنال"],
+        ["🎯 تارگت"]
+    ],
+    resize_keyboard=True
+)
 
 # =========================
 # start
 # =========================
 
-async def start(update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 ربات فعال شد (نسخه ایران)\n\n"
-        "📊 BTC / ETH / BNB / SOL / XRP / DOGE / ADA\n"
-        "🚀 سیگنال خودکار فعال است",
-        reply_markup=reply_markup
+        "🤖 ربات سیگنال کریپتو فعال شد\n\n"
+        "📊 انتخاب ارز + سیگنال اختصاصی + تارگت",
+        reply_markup=main_keyboard
     )
 
 # =========================
-# قیمت همه
+# گرفتن قیمت
 # =========================
 
-async def prices(update, context):
-    text = "💰 قیمت‌ها:\n\n"
+async def prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = "💰 قیمت ارزها:\n\n"
 
-    for s, cid in COINS.items():
+    for s in COINS:
         p = get_price(s)
         if p:
             text += f"{s}: {p}$\n"
@@ -151,22 +145,20 @@ async def prices(update, context):
     await update.message.reply_text(text)
 
 # =========================
-# راهنما سیگنال
+# منوی انتخاب ارز برای سیگنال
 # =========================
 
-async def signals(update, context):
+async def signal_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📊 سیستم سیگنال فعال:\n\n"
-        "🚀 Pump / Dump > 2%\n"
-        "⏱ بررسی هر 15 ثانیه\n"
-        "📡 CoinGecko API (بدون تحریم)"
+        "📊 یک ارز برای سیگنال انتخاب کن 👇",
+        reply_markup=coin_menu()
     )
 
 # =========================
 # تارگت
 # =========================
 
-async def target(update, context):
+async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         symbol = context.args[0].upper()
         price = float(context.args[1])
@@ -183,32 +175,68 @@ async def target(update, context):
         )
 
 # =========================
-# handler
+# کلیک روی ارزها (سیگنال اختصاصی)
 # =========================
 
-def handle(update, context):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+
+    if data.startswith("coin_"):
+        symbol = data.replace("coin_", "")
+
+        price = get_price(symbol)
+
+        # سیگنال ساده بر اساس حرکت فرضی (آپدیت بعدی میشه واقعی‌تر)
+        old = price_history.get(symbol, price)
+        change = ((price - old) / old) * 100 if old else 0
+
+        price_history[symbol] = price
+
+        signal = "⚪ NEUTRAL"
+        if change >= 2:
+            signal = "🚀 PUMP"
+        elif change <= -2:
+            signal = "📉 DUMP"
+
+        text = (
+            f"📊 {symbol}\n\n"
+            f"💰 Price: {price}$\n"
+            f"📈 Change: {change:.2f}%\n"
+            f"📡 Signal: {signal}"
+        )
+
+        await query.edit_message_text(text)
+
+# =========================
+# پیام‌های متنی
+# =========================
+
+def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "💰 قیمت‌ها":
+    if text == "💰 قیمت ارزها":
         return prices(update, context)
 
     if text == "📊 سیگنال":
-        return signals(update, context)
+        return signal_menu(update, context)
 
     if text == "🎯 تارگت":
         update.message.reply_text("مثال:\n/target BTCUSDT 80000")
 
 # =========================
-# اجرا
+# اجرای ربات
 # =========================
 
 app = Application.builder().token(BOT_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("target", target))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
-threading.Thread(target=scanner, daemon=True).start()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+app.add_handler(CallbackQueryHandler(button_handler))
 
 print("BOT RUNNING 🚀")
 app.run_polling()
