@@ -15,32 +15,33 @@ from telegram.ext import (
 )
 
 from tradingview_ta import TA_Handler, Interval
+
 import asyncio
+import os
 
 # =====================================
-# BOT TOKEN
+# TOKEN
 # =====================================
 
-BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
+BOT_TOKEN = os.getenv("8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0")
 
 # =====================================
 # SYMBOLS
 # =====================================
 
 COINS = {
-    "BTCUSDT": "BINANCE",
-    "ETHUSDT": "BINANCE",
-    "BNBUSDT": "BINANCE",
-    "SOLUSDT": "BINANCE",
-    "XRPUSDT": "BINANCE",
-    "DOGEUSDT": "BINANCE",
-    "ADAUSDT": "BINANCE",
-    "TRXUSDT": "BINANCE",
-    "HYPEUSDT": "BINANCE",
-    "UBUSDT": "BINANCE",
-    "XAUUSD": "OANDA",
-    "XAGUSD": "OANDA",
-    "USDT": "BINANCE"
+    "BTCUSDT": ("BINANCE", "BTCUSDT"),
+    "ETHUSDT": ("BINANCE", "ETHUSDT"),
+    "BNBUSDT": ("BINANCE", "BNBUSDT"),
+    "SOLUSDT": ("BINANCE", "SOLUSDT"),
+    "XRPUSDT": ("BINANCE", "XRPUSDT"),
+    "DOGEUSDT": ("BINANCE", "DOGEUSDT"),
+    "ADAUSDT": ("BINANCE", "ADAUSDT"),
+    "TRXUSDT": ("BINANCE", "TRXUSDT"),
+    "HYPEUSDT": ("BINANCE", "HYPEUSDT"),
+    "UBUSDT": ("BINANCE", "UBUSDT"),
+    "XAUUSD": ("OANDA", "XAUUSD"),
+    "XAGUSD": ("OANDA", "XAGUSD")
 }
 
 # =====================================
@@ -82,7 +83,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ RSI\n"
         "✅ حجم بازار\n"
         "✅ نقدینگی\n"
-        "✅ تایم فریم‌های مختلف",
+        "✅ تایم فریم 5m / 15m / 4h / 1d",
         reply_markup=main_keyboard
     )
 
@@ -144,29 +145,36 @@ def timeframe_menu(prefix, symbol):
     ])
 
 # =====================================
-# GET ANALYSIS
+# ANALYSIS
 # =====================================
 
 def get_analysis(symbol, interval):
 
-    exchange = COINS[symbol]
+    try:
 
-    screener = "crypto"
+        exchange, tv_symbol = COINS[symbol]
 
-    if exchange == "OANDA":
-        screener = "forex"
+        screener = "crypto"
 
-    handler = TA_Handler(
-        symbol=symbol,
-        screener=screener,
-        exchange=exchange,
-        interval=interval
-    )
+        if exchange == "OANDA":
+            screener = "forex"
 
-    return handler.get_analysis()
+        handler = TA_Handler(
+            symbol=tv_symbol,
+            screener=screener,
+            exchange=exchange,
+            interval=interval
+        )
+
+        return handler.get_analysis()
+
+    except Exception as e:
+
+        print("ANALYSIS ERROR:", e)
+        return None
 
 # =====================================
-# PRICE MENU
+# MENUS
 # =====================================
 
 async def prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -176,20 +184,12 @@ async def prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=coin_menu("price")
     )
 
-# =====================================
-# SIGNAL MENU
-# =====================================
-
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "📊 ارز مورد نظر برای سیگنال:",
         reply_markup=coin_menu("signal")
     )
-
-# =====================================
-# RSI MENU
-# =====================================
 
 async def indicator(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -198,20 +198,12 @@ async def indicator(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=coin_menu("rsi")
     )
 
-# =====================================
-# VOLUME MENU
-# =====================================
-
 async def volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "📦 ارز مورد نظر برای حجم:",
         reply_markup=coin_menu("volume")
     )
-
-# =====================================
-# LIQUIDITY MENU
-# =====================================
 
 async def liquidity(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -232,9 +224,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
 
-    # =====================================
+    # =================================
     # PRICE
-    # =====================================
+    # =================================
 
     if data.startswith("price_coin_"):
 
@@ -252,10 +244,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(
-            symbol,
-            TIMEFRAMES[tf]
-        )
+        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+
+        if analysis is None:
+            await query.edit_message_text("❌ خطا در دریافت دیتا")
+            return
 
         price = analysis.indicators["close"]
 
@@ -267,9 +260,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text)
 
-    # =====================================
+    # =================================
     # SIGNAL
-    # =====================================
+    # =================================
 
     elif data.startswith("signal_coin_"):
 
@@ -287,10 +280,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(
-            symbol,
-            TIMEFRAMES[tf]
-        )
+        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+
+        if analysis is None:
+            await query.edit_message_text("❌ خطا در دریافت دیتا")
+            return
 
         recommendation = analysis.summary["RECOMMENDATION"]
 
@@ -298,20 +292,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sell = analysis.summary["SELL"]
         neutral = analysis.summary["NEUTRAL"]
 
+        ema25 = analysis.indicators.get("EMA25", "N/A")
+        ema50 = analysis.indicators.get("EMA50", "N/A")
+        ema100 = analysis.indicators.get("EMA100", "N/A")
+        ema200 = analysis.indicators.get("EMA200", "N/A")
+
         text = (
             f"📊 سیگنال {symbol}\n\n"
             f"⏰ تایم فریم: {tf}\n\n"
             f"📡 وضعیت: {recommendation}\n\n"
             f"🟢 BUY: {buy}\n"
             f"🔴 SELL: {sell}\n"
-            f"⚪ NEUTRAL: {neutral}"
+            f"⚪ NEUTRAL: {neutral}\n\n"
+            f"📈 EMA 25: {ema25}\n"
+            f"📈 EMA 50: {ema50}\n"
+            f"📈 EMA 100: {ema100}\n"
+            f"📈 EMA 200: {ema200}"
         )
 
         await query.edit_message_text(text)
 
-    # =====================================
+    # =================================
     # RSI
-    # =====================================
+    # =================================
 
     elif data.startswith("rsi_coin_"):
 
@@ -329,10 +332,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(
-            symbol,
-            TIMEFRAMES[tf]
-        )
+        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+
+        if analysis is None:
+            await query.edit_message_text("❌ خطا در دریافت دیتا")
+            return
 
         rsi = analysis.indicators["RSI"]
 
@@ -356,9 +360,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text)
 
-    # =====================================
+    # =================================
     # VOLUME
-    # =====================================
+    # =================================
 
     elif data.startswith("volume_coin_"):
 
@@ -376,10 +380,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(
-            symbol,
-            TIMEFRAMES[tf]
-        )
+        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+
+        if analysis is None:
+            await query.edit_message_text("❌ خطا در دریافت دیتا")
+            return
 
         buy = analysis.summary["BUY"]
         sell = analysis.summary["SELL"]
@@ -402,9 +407,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text)
 
-    # =====================================
+    # =================================
     # LIQUIDITY
-    # =====================================
+    # =================================
 
     elif data.startswith("liq_coin_"):
 
@@ -422,10 +427,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(
-            symbol,
-            TIMEFRAMES[tf]
-        )
+        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+
+        if analysis is None:
+            await query.edit_message_text("❌ خطا در دریافت دیتا")
+            return
 
         high = analysis.indicators["high"]
         low = analysis.indicators["low"]
@@ -434,12 +440,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
             f"💧 نقدینگی {symbol}\n\n"
             f"⏰ تایم فریم: {tf}\n\n"
-            f"🔼 ناحیه نقدینگی بالا:\n"
-            f"{high}\n\n"
-            f"🔽 ناحیه نقدینگی پایین:\n"
-            f"{low}\n\n"
-            f"💰 قیمت فعلی:\n"
-            f"{close}"
+            f"🔼 ناحیه نقدینگی بالا:\n{high}\n\n"
+            f"🔽 ناحیه نقدینگی پایین:\n{low}\n\n"
+            f"💰 قیمت فعلی:\n{close}"
         )
 
         await query.edit_message_text(text)
@@ -468,7 +471,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await liquidity(update, context)
 
 # =====================================
-# RUN BOT
+# RUN
 # =====================================
 
 app = Application.builder().token(BOT_TOKEN).build()
@@ -482,9 +485,7 @@ app.add_handler(
     )
 )
 
-app.add_handler(
-    CallbackQueryHandler(button_handler)
-)
+app.add_handler(CallbackQueryHandler(button_handler))
 
 print("BOT RUNNING 🚀")
 
