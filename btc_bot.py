@@ -17,16 +17,19 @@ from telegram.ext import (
 from tradingview_ta import TA_Handler, Interval
 
 import asyncio
-import os
+import threading
+import time
 
 # =====================================
-# TOKEN
+# TOKEN + CHAT ID
 # =====================================
 
-BOT_TOKEN = os.getenv("8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0")
+BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
+
+CHAT_ID = "369031827"
 
 # =====================================
-# SYMBOLS
+# COINS
 # =====================================
 
 COINS = {
@@ -39,9 +42,10 @@ COINS = {
     "ADAUSDT": ("BINANCE", "ADAUSDT"),
     "TRXUSDT": ("BINANCE", "TRXUSDT"),
     "HYPEUSDT": ("BINANCE", "HYPEUSDT"),
-    "UBUSDT": ("BINANCE", "UBUSDT"),
+    "ZECUSDT": ("BINANCE", "ZECUSDT"),
     "XAUUSD": ("OANDA", "XAUUSD"),
-    "XAGUSD": ("OANDA", "XAGUSD")
+    "XAGUSD": ("OANDA", "XAGUSD"),
+    "USDT": ("CRYPTOCAP", "USDT")
 }
 
 # =====================================
@@ -49,11 +53,16 @@ COINS = {
 # =====================================
 
 TIMEFRAMES = {
-    "5m": Interval.INTERVAL_5_MINUTES,
     "15m": Interval.INTERVAL_15_MINUTES,
     "4h": Interval.INTERVAL_4_HOURS,
     "1d": Interval.INTERVAL_1_DAY
 }
+
+# =====================================
+# TARGETS
+# =====================================
+
+user_targets = {}
 
 # =====================================
 # MAIN MENU
@@ -61,94 +70,22 @@ TIMEFRAMES = {
 
 main_keyboard = ReplyKeyboardMarkup(
     [
-        ["💰 قیمت"],
+        ["🚀 شروع ربات"],
+        ["💰 قیمت لحظه‌ای"],
         ["📊 سیگنال"],
-        ["📈 اندیکاتور"],
-        ["📦 حجم"],
-        ["💧 نقدینگی"]
+        ["📈 اندیکاتور RSI"],
+        ["📦 حجم بازار"],
+        ["💧 نقدینگی"],
+        ["🎯 تنظیم تارگت"]
     ],
     resize_keyboard=True
 )
 
 # =====================================
-# START
+# GET ANALYSIS
 # =====================================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    await update.message.reply_text(
-        "🤖 ربات حرفه‌ای کریپتو فعال شد\n\n"
-        "✅ قیمت لحظه‌ای\n"
-        "✅ سیگنال\n"
-        "✅ RSI\n"
-        "✅ حجم بازار\n"
-        "✅ نقدینگی\n"
-        "✅ تایم فریم 5m / 15m / 4h / 1d",
-        reply_markup=main_keyboard
-    )
-
-# =====================================
-# COIN MENU
-# =====================================
-
-def coin_menu(prefix):
-
-    buttons = []
-
-    row = []
-
-    for symbol in COINS.keys():
-
-        row.append(
-            InlineKeyboardButton(
-                symbol,
-                callback_data=f"{prefix}_coin_{symbol}"
-            )
-        )
-
-        if len(row) == 2:
-            buttons.append(row)
-            row = []
-
-    if row:
-        buttons.append(row)
-
-    return InlineKeyboardMarkup(buttons)
-
-# =====================================
-# TIMEFRAME MENU
-# =====================================
-
-def timeframe_menu(prefix, symbol):
-
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "5m",
-                callback_data=f"{prefix}_tf_{symbol}_5m"
-            ),
-            InlineKeyboardButton(
-                "15m",
-                callback_data=f"{prefix}_tf_{symbol}_15m"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "4H",
-                callback_data=f"{prefix}_tf_{symbol}_4h"
-            ),
-            InlineKeyboardButton(
-                "1D",
-                callback_data=f"{prefix}_tf_{symbol}_1d"
-            )
-        ]
-    ])
-
-# =====================================
-# ANALYSIS
-# =====================================
-
-def get_analysis(symbol, interval):
+def get_analysis(symbol, interval=Interval.INTERVAL_15_MINUTES):
 
     try:
 
@@ -170,47 +107,208 @@ def get_analysis(symbol, interval):
 
     except Exception as e:
 
-        print("ANALYSIS ERROR:", e)
+        print("ERROR:", e)
         return None
+
+# =====================================
+# GET PRICE
+# =====================================
+
+def get_price(symbol):
+
+    analysis = get_analysis(symbol)
+
+    if analysis:
+        return analysis.indicators.get("close")
+
+    return None
+
+# =====================================
+# COIN MENU
+# =====================================
+
+def coin_menu(prefix):
+
+    buttons = []
+
+    row = []
+
+    for symbol in COINS.keys():
+
+        row.append(
+            InlineKeyboardButton(
+                symbol,
+                callback_data=f"{prefix}_{symbol}"
+            )
+        )
+
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+
+    if row:
+        buttons.append(row)
+
+    return InlineKeyboardMarkup(buttons)
+
+# =====================================
+# TIMEFRAME MENU
+# =====================================
+
+def timeframe_menu(prefix, symbol):
+
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "15m",
+                callback_data=f"{prefix}_{symbol}_15m"
+            ),
+            InlineKeyboardButton(
+                "4H",
+                callback_data=f"{prefix}_{symbol}_4h"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "1D",
+                callback_data=f"{prefix}_{symbol}_1d"
+            )
+        ]
+    ])
+
+# =====================================
+# START
+# =====================================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    text = (
+        "🤖 ربات حرفه‌ای کریپتو فعال شد\n\n"
+        "✅ قیمت لحظه‌ای\n"
+        "✅ سیگنال حرفه‌ای\n"
+        "✅ RSI\n"
+        "✅ حجم خرید و فروش\n"
+        "✅ نقدینگی\n"
+        "✅ تارگت قیمت\n"
+        "✅ طلا و نقره\n"
+        "✅ تایم فریم 15m / 4h / 1d"
+    )
+
+    await update.message.reply_text(
+        text,
+        reply_markup=main_keyboard
+    )
 
 # =====================================
 # MENUS
 # =====================================
 
-async def prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def price_menu(update, context):
 
     await update.message.reply_text(
         "💰 ارز مورد نظر را انتخاب کن:",
         reply_markup=coin_menu("price")
     )
 
-async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def signal_menu(update, context):
 
     await update.message.reply_text(
-        "📊 ارز مورد نظر برای سیگنال:",
+        "📊 ارز مورد نظر:",
         reply_markup=coin_menu("signal")
     )
 
-async def indicator(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def rsi_menu(update, context):
 
     await update.message.reply_text(
-        "📈 ارز مورد نظر برای RSI:",
+        "📈 ارز مورد نظر:",
         reply_markup=coin_menu("rsi")
     )
 
-async def volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def volume_menu(update, context):
 
     await update.message.reply_text(
-        "📦 ارز مورد نظر برای حجم:",
+        "📦 ارز مورد نظر:",
         reply_markup=coin_menu("volume")
     )
 
-async def liquidity(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def liquidity_menu(update, context):
 
     await update.message.reply_text(
-        "💧 ارز مورد نظر برای نقدینگی:",
+        "💧 ارز مورد نظر:",
         reply_markup=coin_menu("liq")
     )
+
+async def target_menu(update, context):
+
+    await update.message.reply_text(
+        "🎯 مثال:\n/target BTCUSDT 120000"
+    )
+
+# =====================================
+# TARGET COMMAND
+# =====================================
+
+async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    try:
+
+        symbol = context.args[0].upper()
+        price = float(context.args[1])
+
+        user_targets[symbol] = price
+
+        await update.message.reply_text(
+            f"✅ تارگت ثبت شد\n\n"
+            f"{symbol} → {price}"
+        )
+
+    except:
+
+        await update.message.reply_text(
+            "❌ مثال صحیح:\n"
+            "/target BTCUSDT 120000"
+        )
+
+# =====================================
+# TARGET CHECKER
+# =====================================
+
+def target_checker(app):
+
+    while True:
+
+        try:
+
+            for symbol, target_price in list(user_targets.items()):
+
+                current_price = get_price(symbol)
+
+                if current_price is None:
+                    continue
+
+                if current_price >= target_price:
+
+                    text = (
+                        f"🎯 TARGET HIT\n\n"
+                        f"{symbol}\n"
+                        f"💰 Price: {current_price}"
+                    )
+
+                    asyncio.run(
+                        app.bot.send_message(
+                            chat_id=CHAT_ID,
+                            text=text
+                        )
+                    )
+
+                    del user_targets[symbol]
+
+            time.sleep(30)
+
+        except Exception as e:
+
+            print("TARGET ERROR:", e)
+            time.sleep(30)
 
 # =====================================
 # BUTTON HANDLER
@@ -224,118 +322,90 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
 
-    # =================================
     # PRICE
-    # =================================
 
-    if data.startswith("price_coin_"):
+    if data.startswith("price_"):
 
-        symbol = data.replace("price_coin_", "")
+        symbol = data.replace("price_", "")
 
-        await query.edit_message_text(
-            f"⏰ تایم فریم {symbol} را انتخاب کن:",
-            reply_markup=timeframe_menu("price", symbol)
-        )
+        price = get_price(symbol)
 
-    elif data.startswith("price_tf_"):
+        if price is None:
 
-        parts = data.split("_")
+            await query.edit_message_text(
+                "❌ دریافت قیمت ناموفق بود"
+            )
 
-        symbol = parts[2]
-        tf = parts[3]
-
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
-
-        if analysis is None:
-            await query.edit_message_text("❌ خطا در دریافت دیتا")
             return
 
-        price = analysis.indicators["close"]
-
-        text = (
+        await query.edit_message_text(
             f"💰 {symbol}\n\n"
-            f"⏰ تایم فریم: {tf}\n"
-            f"📌 قیمت: {price}"
+            f"📌 قیمت لحظه‌ای:\n{price}"
         )
 
-        await query.edit_message_text(text)
-
-    # =================================
     # SIGNAL
-    # =================================
 
-    elif data.startswith("signal_coin_"):
+    elif data.startswith("signal_") and "_15m" not in data and "_4h" not in data and "_1d" not in data:
 
-        symbol = data.replace("signal_coin_", "")
+        symbol = data.replace("signal_", "")
 
         await query.edit_message_text(
             f"⏰ تایم فریم {symbol}:",
             reply_markup=timeframe_menu("signal", symbol)
         )
 
-    elif data.startswith("signal_tf_"):
+    elif data.startswith("signal_"):
 
         parts = data.split("_")
 
-        symbol = parts[2]
-        tf = parts[3]
+        symbol = parts[1]
+        tf = parts[2]
 
         analysis = get_analysis(symbol, TIMEFRAMES[tf])
 
         if analysis is None:
-            await query.edit_message_text("❌ خطا در دریافت دیتا")
+
+            await query.edit_message_text("❌ خطا")
+
             return
 
-        recommendation = analysis.summary["RECOMMENDATION"]
-
-        buy = analysis.summary["BUY"]
-        sell = analysis.summary["SELL"]
-        neutral = analysis.summary["NEUTRAL"]
-
-        ema25 = analysis.indicators.get("EMA25", "N/A")
-        ema50 = analysis.indicators.get("EMA50", "N/A")
-        ema100 = analysis.indicators.get("EMA100", "N/A")
-        ema200 = analysis.indicators.get("EMA200", "N/A")
+        summary = analysis.summary
 
         text = (
-            f"📊 سیگنال {symbol}\n\n"
+            f"📊 {symbol}\n\n"
             f"⏰ تایم فریم: {tf}\n\n"
-            f"📡 وضعیت: {recommendation}\n\n"
-            f"🟢 BUY: {buy}\n"
-            f"🔴 SELL: {sell}\n"
-            f"⚪ NEUTRAL: {neutral}\n\n"
-            f"📈 EMA 25: {ema25}\n"
-            f"📈 EMA 50: {ema50}\n"
-            f"📈 EMA 100: {ema100}\n"
-            f"📈 EMA 200: {ema200}"
+            f"📡 وضعیت: {summary['RECOMMENDATION']}\n\n"
+            f"🟢 BUY: {summary['BUY']}\n"
+            f"🔴 SELL: {summary['SELL']}\n"
+            f"⚪ NEUTRAL: {summary['NEUTRAL']}"
         )
 
         await query.edit_message_text(text)
 
-    # =================================
     # RSI
-    # =================================
 
-    elif data.startswith("rsi_coin_"):
+    elif data.startswith("rsi_") and "_15m" not in data and "_4h" not in data and "_1d" not in data:
 
-        symbol = data.replace("rsi_coin_", "")
+        symbol = data.replace("rsi_", "")
 
         await query.edit_message_text(
             f"⏰ تایم فریم RSI {symbol}:",
             reply_markup=timeframe_menu("rsi", symbol)
         )
 
-    elif data.startswith("rsi_tf_"):
+    elif data.startswith("rsi_"):
 
         parts = data.split("_")
 
-        symbol = parts[2]
-        tf = parts[3]
+        symbol = parts[1]
+        tf = parts[2]
 
         analysis = get_analysis(symbol, TIMEFRAMES[tf])
 
         if analysis is None:
-            await query.edit_message_text("❌ خطا در دریافت دیتا")
+
+            await query.edit_message_text("❌ خطا")
+
             return
 
         rsi = analysis.indicators["RSI"]
@@ -343,106 +413,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         status = "⚪ خنثی"
 
         if rsi >= 70:
-            status = "🔴 نزدیک اشباع خرید"
+            status = "🔴 اشباع خرید"
 
         elif rsi <= 30:
-            status = "🟢 نزدیک اشباع فروش"
+            status = "🟢 اشباع فروش"
 
         elif 45 <= rsi <= 55:
             status = "🟡 نزدیک RSI 50"
 
         text = (
             f"📈 RSI {symbol}\n\n"
-            f"⏰ تایم فریم: {tf}\n"
+            f"⏰ تایم فریم: {tf}\n\n"
             f"📌 RSI: {rsi:.2f}\n\n"
-            f"📡 وضعیت: {status}"
-        )
-
-        await query.edit_message_text(text)
-
-    # =================================
-    # VOLUME
-    # =================================
-
-    elif data.startswith("volume_coin_"):
-
-        symbol = data.replace("volume_coin_", "")
-
-        await query.edit_message_text(
-            f"⏰ تایم فریم حجم {symbol}:",
-            reply_markup=timeframe_menu("volume", symbol)
-        )
-
-    elif data.startswith("volume_tf_"):
-
-        parts = data.split("_")
-
-        symbol = parts[2]
-        tf = parts[3]
-
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
-
-        if analysis is None:
-            await query.edit_message_text("❌ خطا در دریافت دیتا")
-            return
-
-        buy = analysis.summary["BUY"]
-        sell = analysis.summary["SELL"]
-
-        status = "⚪ متعادل"
-
-        if buy > sell:
-            status = "🟢 فشار خرید"
-
-        elif sell > buy:
-            status = "🔴 فشار فروش"
-
-        text = (
-            f"📦 حجم {symbol}\n\n"
-            f"⏰ تایم فریم: {tf}\n\n"
-            f"🟢 BUY: {buy}\n"
-            f"🔴 SELL: {sell}\n\n"
-            f"📡 وضعیت: {status}"
-        )
-
-        await query.edit_message_text(text)
-
-    # =================================
-    # LIQUIDITY
-    # =================================
-
-    elif data.startswith("liq_coin_"):
-
-        symbol = data.replace("liq_coin_", "")
-
-        await query.edit_message_text(
-            f"⏰ تایم فریم نقدینگی {symbol}:",
-            reply_markup=timeframe_menu("liq", symbol)
-        )
-
-    elif data.startswith("liq_tf_"):
-
-        parts = data.split("_")
-
-        symbol = parts[2]
-        tf = parts[3]
-
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
-
-        if analysis is None:
-            await query.edit_message_text("❌ خطا در دریافت دیتا")
-            return
-
-        high = analysis.indicators["high"]
-        low = analysis.indicators["low"]
-        close = analysis.indicators["close"]
-
-        text = (
-            f"💧 نقدینگی {symbol}\n\n"
-            f"⏰ تایم فریم: {tf}\n\n"
-            f"🔼 ناحیه نقدینگی بالا:\n{high}\n\n"
-            f"🔽 ناحیه نقدینگی پایین:\n{low}\n\n"
-            f"💰 قیمت فعلی:\n{close}"
+            f"📡 وضعیت:\n{status}"
         )
 
         await query.edit_message_text(text)
@@ -451,24 +434,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # TEXT HANDLER
 # =====================================
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
 
-    if text == "💰 قیمت":
-        await prices(update, context)
+    if text == "🚀 شروع ربات":
+
+        await start(update, context)
+
+    elif text == "💰 قیمت لحظه‌ای":
+
+        await price_menu(update, context)
 
     elif text == "📊 سیگنال":
-        await signal(update, context)
 
-    elif text == "📈 اندیکاتور":
-        await indicator(update, context)
+        await signal_menu(update, context)
 
-    elif text == "📦 حجم":
-        await volume(update, context)
+    elif text == "📈 اندیکاتور RSI":
+
+        await rsi_menu(update, context)
+
+    elif text == "📦 حجم بازار":
+
+        await volume_menu(update, context)
 
     elif text == "💧 نقدینگی":
-        await liquidity(update, context)
+
+        await liquidity_menu(update, context)
+
+    elif text == "🎯 تنظیم تارگت":
+
+        await target_menu(update, context)
 
 # =====================================
 # RUN
@@ -478,17 +474,27 @@ app = Application.builder().token(BOT_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 
+app.add_handler(CommandHandler("target", target))
+
 app.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
-        handle_text
+        text_handler
     )
 )
 
 app.add_handler(CallbackQueryHandler(button_handler))
 
+threading.Thread(
+    target=target_checker,
+    args=(app,),
+    daemon=True
+).start()
+
 print("BOT RUNNING 🚀")
 
 asyncio.set_event_loop(asyncio.new_event_loop())
 
-app.run_polling(drop_pending_updates=True)
+app.run_polling(
+    drop_pending_updates=True
+)
