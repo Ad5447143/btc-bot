@@ -17,15 +17,15 @@ from telegram.ext import (
 from tradingview_ta import TA_Handler, Interval
 import asyncio
 
-# =========================
+# =====================================
 # BOT TOKEN
-# =========================
+# =====================================
 
-BOT_TOKEN = "توکن_ربات_خودت"
+BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 
-# =========================
+# =====================================
 # SYMBOLS
-# =========================
+# =====================================
 
 COINS = {
     "BTCUSDT": "BINANCE",
@@ -37,14 +37,15 @@ COINS = {
     "ADAUSDT": "BINANCE",
     "TRXUSDT": "BINANCE",
     "HYPEUSDT": "BINANCE",
+    "UBUSDT": "BINANCE",
     "XAUUSD": "OANDA",
     "XAGUSD": "OANDA",
     "USDT": "BINANCE"
 }
 
-# =========================
+# =====================================
 # TIMEFRAMES
-# =========================
+# =====================================
 
 TIMEFRAMES = {
     "5m": Interval.INTERVAL_5_MINUTES,
@@ -53,40 +54,41 @@ TIMEFRAMES = {
     "1d": Interval.INTERVAL_1_DAY
 }
 
-# =========================
-# TEMP USER DATA
-# =========================
-
-user_data_store = {}
-
-# =========================
+# =====================================
 # MAIN MENU
-# =========================
+# =====================================
 
 main_keyboard = ReplyKeyboardMarkup(
     [
         ["💰 قیمت"],
         ["📊 سیگنال"],
         ["📈 اندیکاتور"],
-        ["💧 نقدینگی"],
-        ["📦 حجم"]
+        ["📦 حجم"],
+        ["💧 نقدینگی"]
     ],
     resize_keyboard=True
 )
 
-# =========================
+# =====================================
 # START
-# =========================
+# =====================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     await update.message.reply_text(
-        "🤖 ربات حرفه‌ای کریپتو فعال شد",
+        "🤖 ربات حرفه‌ای کریپتو فعال شد\n\n"
+        "✅ قیمت لحظه‌ای\n"
+        "✅ سیگنال\n"
+        "✅ RSI\n"
+        "✅ حجم بازار\n"
+        "✅ نقدینگی\n"
+        "✅ تایم فریم‌های مختلف",
         reply_markup=main_keyboard
     )
 
-# =========================
+# =====================================
 # COIN MENU
-# =========================
+# =====================================
 
 def coin_menu(prefix):
 
@@ -112,9 +114,9 @@ def coin_menu(prefix):
 
     return InlineKeyboardMarkup(buttons)
 
-# =========================
+# =====================================
 # TIMEFRAME MENU
-# =========================
+# =====================================
 
 def timeframe_menu(prefix, symbol):
 
@@ -131,7 +133,7 @@ def timeframe_menu(prefix, symbol):
         ],
         [
             InlineKeyboardButton(
-                "4h",
+                "4H",
                 callback_data=f"{prefix}_tf_{symbol}_4h"
             ),
             InlineKeyboardButton(
@@ -141,92 +143,98 @@ def timeframe_menu(prefix, symbol):
         ]
     ])
 
-# =========================
+# =====================================
 # GET ANALYSIS
-# =========================
+# =====================================
 
 def get_analysis(symbol, interval):
 
     exchange = COINS[symbol]
 
+    screener = "crypto"
+
+    if exchange == "OANDA":
+        screener = "forex"
+
     handler = TA_Handler(
         symbol=symbol,
-        screener="crypto" if exchange == "BINANCE" else "forex",
+        screener=screener,
         exchange=exchange,
         interval=interval
     )
 
     return handler.get_analysis()
 
-# =========================
-# PRICE
-# =========================
+# =====================================
+# PRICE MENU
+# =====================================
 
 async def prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "💰 انتخاب ارز:",
+        "💰 ارز مورد نظر را انتخاب کن:",
         reply_markup=coin_menu("price")
     )
 
-# =========================
-# SIGNAL
-# =========================
+# =====================================
+# SIGNAL MENU
+# =====================================
 
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "📊 انتخاب ارز برای سیگنال:",
+        "📊 ارز مورد نظر برای سیگنال:",
         reply_markup=coin_menu("signal")
     )
 
-# =========================
-# RSI
-# =========================
+# =====================================
+# RSI MENU
+# =====================================
 
 async def indicator(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "📈 انتخاب ارز برای RSI:",
+        "📈 ارز مورد نظر برای RSI:",
         reply_markup=coin_menu("rsi")
     )
 
-# =========================
-# VOLUME
-# =========================
+# =====================================
+# VOLUME MENU
+# =====================================
 
 async def volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "📦 انتخاب ارز برای حجم:",
+        "📦 ارز مورد نظر برای حجم:",
         reply_markup=coin_menu("volume")
     )
 
-# =========================
-# LIQUIDITY
-# =========================
+# =====================================
+# LIQUIDITY MENU
+# =====================================
 
 async def liquidity(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "💧 انتخاب ارز برای نقدینگی:",
+        "💧 ارز مورد نظر برای نقدینگی:",
         reply_markup=coin_menu("liq")
     )
 
-# =========================
+# =====================================
 # BUTTON HANDLER
-# =========================
+# =====================================
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
+
     await query.answer()
 
     data = query.data
 
-    # =====================
+    # =====================================
     # PRICE
-    # =====================
+    # =====================================
 
     if data.startswith("price_coin_"):
 
@@ -244,21 +252,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+        analysis = get_analysis(
+            symbol,
+            TIMEFRAMES[tf]
+        )
 
         price = analysis.indicators["close"]
 
         text = (
-            f"💰 {symbol}\n"
-            f"⏰ تایم فریم: {tf}\n\n"
+            f"💰 {symbol}\n\n"
+            f"⏰ تایم فریم: {tf}\n"
             f"📌 قیمت: {price}"
         )
 
         await query.edit_message_text(text)
 
-    # =====================
+    # =====================================
     # SIGNAL
-    # =====================
+    # =====================================
 
     elif data.startswith("signal_coin_"):
 
@@ -276,21 +287,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+        analysis = get_analysis(
+            symbol,
+            TIMEFRAMES[tf]
+        )
 
-        rec = analysis.summary["RECOMMENDATION"]
+        recommendation = analysis.summary["RECOMMENDATION"]
+
+        buy = analysis.summary["BUY"]
+        sell = analysis.summary["SELL"]
+        neutral = analysis.summary["NEUTRAL"]
 
         text = (
-            f"📊 سیگنال {symbol}\n"
+            f"📊 سیگنال {symbol}\n\n"
             f"⏰ تایم فریم: {tf}\n\n"
-            f"📡 وضعیت: {rec}"
+            f"📡 وضعیت: {recommendation}\n\n"
+            f"🟢 BUY: {buy}\n"
+            f"🔴 SELL: {sell}\n"
+            f"⚪ NEUTRAL: {neutral}"
         )
 
         await query.edit_message_text(text)
 
-    # =====================
+    # =====================================
     # RSI
-    # =====================
+    # =====================================
 
     elif data.startswith("rsi_coin_"):
 
@@ -308,33 +329,36 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+        analysis = get_analysis(
+            symbol,
+            TIMEFRAMES[tf]
+        )
 
         rsi = analysis.indicators["RSI"]
 
-        status = "خنثی"
+        status = "⚪ خنثی"
 
         if rsi >= 70:
-            status = "🔴 اشباع خرید"
+            status = "🔴 نزدیک اشباع خرید"
 
         elif rsi <= 30:
-            status = "🟢 اشباع فروش"
+            status = "🟢 نزدیک اشباع فروش"
 
         elif 45 <= rsi <= 55:
             status = "🟡 نزدیک RSI 50"
 
         text = (
-            f"📈 RSI {symbol}\n"
-            f"⏰ تایم فریم: {tf}\n\n"
-            f"📌 RSI: {rsi:.2f}\n"
+            f"📈 RSI {symbol}\n\n"
+            f"⏰ تایم فریم: {tf}\n"
+            f"📌 RSI: {rsi:.2f}\n\n"
             f"📡 وضعیت: {status}"
         )
 
         await query.edit_message_text(text)
 
-    # =====================
+    # =====================================
     # VOLUME
-    # =====================
+    # =====================================
 
     elif data.startswith("volume_coin_"):
 
@@ -352,7 +376,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+        analysis = get_analysis(
+            symbol,
+            TIMEFRAMES[tf]
+        )
 
         buy = analysis.summary["BUY"]
         sell = analysis.summary["SELL"]
@@ -366,7 +393,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             status = "🔴 فشار فروش"
 
         text = (
-            f"📦 حجم {symbol}\n"
+            f"📦 حجم {symbol}\n\n"
             f"⏰ تایم فریم: {tf}\n\n"
             f"🟢 BUY: {buy}\n"
             f"🔴 SELL: {sell}\n\n"
@@ -375,9 +402,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text)
 
-    # =====================
+    # =====================================
     # LIQUIDITY
-    # =====================
+    # =====================================
 
     elif data.startswith("liq_coin_"):
 
@@ -395,18 +422,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = parts[2]
         tf = parts[3]
 
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+        analysis = get_analysis(
+            symbol,
+            TIMEFRAMES[tf]
+        )
 
         high = analysis.indicators["high"]
         low = analysis.indicators["low"]
         close = analysis.indicators["close"]
 
         text = (
-            f"💧 نقدینگی {symbol}\n"
+            f"💧 نقدینگی {symbol}\n\n"
             f"⏰ تایم فریم: {tf}\n\n"
-            f"🔼 ناحیه لیکوییدیتی بالا:\n"
+            f"🔼 ناحیه نقدینگی بالا:\n"
             f"{high}\n\n"
-            f"🔽 ناحیه لیکوییدیتی پایین:\n"
+            f"🔽 ناحیه نقدینگی پایین:\n"
             f"{low}\n\n"
             f"💰 قیمت فعلی:\n"
             f"{close}"
@@ -414,9 +444,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text)
 
-# =========================
-# MESSAGE HANDLER
-# =========================
+# =====================================
+# TEXT HANDLER
+# =====================================
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -437,9 +467,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "💧 نقدینگی":
         await liquidity(update, context)
 
-# =========================
+# =====================================
 # RUN BOT
-# =========================
+# =====================================
 
 app = Application.builder().token(BOT_TOKEN).build()
 
@@ -452,7 +482,9 @@ app.add_handler(
     )
 )
 
-app.add_handler(CallbackQueryHandler(button_handler))
+app.add_handler(
+    CallbackQueryHandler(button_handler)
+)
 
 print("BOT RUNNING 🚀")
 
