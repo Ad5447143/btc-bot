@@ -21,10 +21,10 @@ import threading
 import time
 
 # =====================================
-# TOKEN + CHAT ID
+# TOKEN
 # =====================================
 
-BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
+BOT_TOKEN = "توکن_ربات_خودت"
 
 CHAT_ID = "369031827"
 
@@ -41,8 +41,9 @@ COINS = {
     "DOGEUSDT": ("BINANCE", "DOGEUSDT"),
     "ADAUSDT": ("BINANCE", "ADAUSDT"),
     "TRXUSDT": ("BINANCE", "TRXUSDT"),
-    "HYPEUSDT": ("BINANCE", "HYPEUSDT"),
     "ZECUSDT": ("BINANCE", "ZECUSDT"),
+    "HYPEUSDT": ("MEXC", "HYPEUSDT"),
+    "UBUSDT": ("MEXC", "UBUSDT"),
     "XAUUSD": ("OANDA", "XAUUSD"),
     "XAGUSD": ("OANDA", "XAGUSD"),
     "USDT": ("CRYPTOCAP", "USDT")
@@ -59,13 +60,16 @@ TIMEFRAMES = {
 }
 
 # =====================================
-# TARGETS
+# STORAGE
 # =====================================
 
 user_targets = {}
+rsi_targets = {}
+
+MAX_ALERTS = 3
 
 # =====================================
-# MAIN MENU
+# MENU
 # =====================================
 
 main_keyboard = ReplyKeyboardMarkup(
@@ -74,6 +78,7 @@ main_keyboard = ReplyKeyboardMarkup(
         ["💰 قیمت لحظه‌ای"],
         ["📊 سیگنال"],
         ["📈 اندیکاتور RSI"],
+        ["🎯 تارگت RSI"],
         ["📦 حجم بازار"],
         ["💧 نقدینگی"],
         ["🎯 تنظیم تارگت"]
@@ -82,7 +87,7 @@ main_keyboard = ReplyKeyboardMarkup(
 )
 
 # =====================================
-# GET ANALYSIS
+# ANALYSIS
 # =====================================
 
 def get_analysis(symbol, interval=Interval.INTERVAL_15_MINUTES):
@@ -108,10 +113,11 @@ def get_analysis(symbol, interval=Interval.INTERVAL_15_MINUTES):
     except Exception as e:
 
         print("ERROR:", e)
+
         return None
 
 # =====================================
-# GET PRICE
+# PRICE
 # =====================================
 
 def get_price(symbol):
@@ -119,12 +125,36 @@ def get_price(symbol):
     analysis = get_analysis(symbol)
 
     if analysis:
+
         return analysis.indicators.get("close")
 
     return None
 
 # =====================================
-# COIN MENU
+# ALERT
+# =====================================
+
+def send_multi_alert(app, text):
+
+    try:
+
+        for i in range(MAX_ALERTS):
+
+            asyncio.run(
+                app.bot.send_message(
+                    chat_id=CHAT_ID,
+                    text=f"{text}\n\n🔔 Alert {i+1}"
+                )
+            )
+
+            time.sleep(2)
+
+    except Exception as e:
+
+        print("ALERT ERROR:", e)
+
+# =====================================
+# MENUS
 # =====================================
 
 def coin_menu(prefix):
@@ -143,17 +173,16 @@ def coin_menu(prefix):
         )
 
         if len(row) == 2:
+
             buttons.append(row)
+
             row = []
 
     if row:
+
         buttons.append(row)
 
     return InlineKeyboardMarkup(buttons)
-
-# =====================================
-# TIMEFRAME MENU
-# =====================================
 
 def timeframe_menu(prefix, symbol):
 
@@ -163,11 +192,13 @@ def timeframe_menu(prefix, symbol):
                 "15m",
                 callback_data=f"{prefix}_{symbol}_15m"
             ),
+
             InlineKeyboardButton(
                 "4H",
                 callback_data=f"{prefix}_{symbol}_4h"
             )
         ],
+
         [
             InlineKeyboardButton(
                 "1D",
@@ -187,6 +218,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ قیمت لحظه‌ای\n"
         "✅ سیگنال حرفه‌ای\n"
         "✅ RSI\n"
+        "✅ تارگت RSI\n"
         "✅ حجم خرید و فروش\n"
         "✅ نقدینگی\n"
         "✅ تارگت قیمت\n"
@@ -200,52 +232,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================================
-# MENUS
-# =====================================
-
-async def price_menu(update, context):
-
-    await update.message.reply_text(
-        "💰 ارز مورد نظر را انتخاب کن:",
-        reply_markup=coin_menu("price")
-    )
-
-async def signal_menu(update, context):
-
-    await update.message.reply_text(
-        "📊 ارز مورد نظر:",
-        reply_markup=coin_menu("signal")
-    )
-
-async def rsi_menu(update, context):
-
-    await update.message.reply_text(
-        "📈 ارز مورد نظر:",
-        reply_markup=coin_menu("rsi")
-    )
-
-async def volume_menu(update, context):
-
-    await update.message.reply_text(
-        "📦 ارز مورد نظر:",
-        reply_markup=coin_menu("volume")
-    )
-
-async def liquidity_menu(update, context):
-
-    await update.message.reply_text(
-        "💧 ارز مورد نظر:",
-        reply_markup=coin_menu("liq")
-    )
-
-async def target_menu(update, context):
-
-    await update.message.reply_text(
-        "🎯 مثال:\n/target BTCUSDT 120000"
-    )
-
-# =====================================
-# TARGET COMMAND
+# TARGET
 # =====================================
 
 async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,6 +240,7 @@ async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
 
         symbol = context.args[0].upper()
+
         price = float(context.args[1])
 
         user_targets[symbol] = price
@@ -265,8 +253,7 @@ async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
 
         await update.message.reply_text(
-            "❌ مثال صحیح:\n"
-            "/target BTCUSDT 120000"
+            "❌ مثال:\n/target BTCUSDT 120000"
         )
 
 # =====================================
@@ -288,17 +275,11 @@ def target_checker(app):
 
                 if current_price >= target_price:
 
-                    text = (
+                    send_multi_alert(
+                        app,
                         f"🎯 TARGET HIT\n\n"
                         f"{symbol}\n"
-                        f"💰 Price: {current_price}"
-                    )
-
-                    asyncio.run(
-                        app.bot.send_message(
-                            chat_id=CHAT_ID,
-                            text=text
-                        )
+                        f"💰 {current_price}"
                     )
 
                     del user_targets[symbol]
@@ -308,10 +289,62 @@ def target_checker(app):
         except Exception as e:
 
             print("TARGET ERROR:", e)
+
             time.sleep(30)
 
 # =====================================
-# BUTTON HANDLER
+# RSI TARGET CHECKER
+# =====================================
+
+def rsi_target_checker(app):
+
+    while True:
+
+        try:
+
+            for key, target in list(rsi_targets.items()):
+
+                parts = key.split("_")
+
+                symbol = parts[0]
+
+                tf = parts[1]
+
+                analysis = get_analysis(
+                    symbol,
+                    TIMEFRAMES[tf]
+                )
+
+                if analysis is None:
+                    continue
+
+                rsi = analysis.indicators.get("RSI")
+
+                if rsi is None:
+                    continue
+
+                if rsi >= target:
+
+                    send_multi_alert(
+                        app,
+                        f"🎯 RSI TARGET HIT\n\n"
+                        f"{symbol}\n"
+                        f"⏰ {tf}\n"
+                        f"📈 RSI: {rsi:.2f}"
+                    )
+
+                    del rsi_targets[key]
+
+            time.sleep(20)
+
+        except Exception as e:
+
+            print("RSI TARGET ERROR:", e)
+
+            time.sleep(20)
+
+# =====================================
+# BUTTONS
 # =====================================
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -333,7 +366,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if price is None:
 
             await query.edit_message_text(
-                "❌ دریافت قیمت ناموفق بود"
+                "❌ موردی یافت نشد"
             )
 
             return
@@ -350,7 +383,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = data.replace("signal_", "")
 
         await query.edit_message_text(
-            f"⏰ تایم فریم {symbol}:",
+            f"⏰ تایم فریم {symbol}",
             reply_markup=timeframe_menu("signal", symbol)
         )
 
@@ -359,13 +392,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
 
         symbol = parts[1]
+
         tf = parts[2]
 
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+        analysis = get_analysis(
+            symbol,
+            TIMEFRAMES[tf]
+        )
 
         if analysis is None:
 
-            await query.edit_message_text("❌ خطا")
+            await query.edit_message_text(
+                "❌ خطا"
+            )
 
             return
 
@@ -389,7 +428,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         symbol = data.replace("rsi_", "")
 
         await query.edit_message_text(
-            f"⏰ تایم فریم RSI {symbol}:",
+            f"⏰ تایم فریم RSI {symbol}",
             reply_markup=timeframe_menu("rsi", symbol)
         )
 
@@ -398,13 +437,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
 
         symbol = parts[1]
+
         tf = parts[2]
 
-        analysis = get_analysis(symbol, TIMEFRAMES[tf])
+        analysis = get_analysis(
+            symbol,
+            TIMEFRAMES[tf]
+        )
 
         if analysis is None:
 
-            await query.edit_message_text("❌ خطا")
+            await query.edit_message_text(
+                "❌ خطا"
+            )
 
             return
 
@@ -430,11 +475,78 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text)
 
+    # RSI TARGET
+
+    elif data.startswith("rsitarget_") and "_15m" not in data and "_4h" not in data and "_1d" not in data:
+
+        symbol = data.replace("rsitarget_", "")
+
+        await query.edit_message_text(
+            f"⏰ تایم فریم RSI Target {symbol}",
+            reply_markup=timeframe_menu("rsitarget", symbol)
+        )
+
+    elif data.startswith("rsitarget_"):
+
+        parts = data.split("_")
+
+        symbol = parts[1]
+
+        tf = parts[2]
+
+        context.user_data["rsi_symbol"] = symbol
+
+        context.user_data["rsi_tf"] = tf
+
+        await query.message.reply_text(
+            "📌 عدد RSI را ارسال کن\nمثال:\n70"
+        )
+
+# =====================================
+# SAVE RSI TARGET
+# =====================================
+
+async def save_rsi_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    try:
+
+        value = float(update.message.text)
+
+        symbol = context.user_data.get("rsi_symbol")
+
+        tf = context.user_data.get("rsi_tf")
+
+        if not symbol or not tf:
+            return
+
+        key = f"{symbol}_{tf}"
+
+        rsi_targets[key] = value
+
+        await update.message.reply_text(
+            f"✅ تارگت RSI ثبت شد\n\n"
+            f"{symbol}\n"
+            f"⏰ {tf}\n"
+            f"📈 {value}"
+        )
+
+        context.user_data.clear()
+
+    except:
+
+        pass
+
 # =====================================
 # TEXT HANDLER
 # =====================================
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if "rsi_symbol" in context.user_data:
+
+        await save_rsi_target(update, context)
+
+        return
 
     text = update.message.text
 
@@ -444,27 +556,49 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "💰 قیمت لحظه‌ای":
 
-        await price_menu(update, context)
+        await update.message.reply_text(
+            "💰 انتخاب ارز:",
+            reply_markup=coin_menu("price")
+        )
 
     elif text == "📊 سیگنال":
 
-        await signal_menu(update, context)
+        await update.message.reply_text(
+            "📊 انتخاب ارز:",
+            reply_markup=coin_menu("signal")
+        )
 
     elif text == "📈 اندیکاتور RSI":
 
-        await rsi_menu(update, context)
+        await update.message.reply_text(
+            "📈 انتخاب ارز:",
+            reply_markup=coin_menu("rsi")
+        )
 
-    elif text == "📦 حجم بازار":
+    elif text == "🎯 تارگت RSI":
 
-        await volume_menu(update, context)
-
-    elif text == "💧 نقدینگی":
-
-        await liquidity_menu(update, context)
+        await update.message.reply_text(
+            "🎯 انتخاب ارز:",
+            reply_markup=coin_menu("rsitarget")
+        )
 
     elif text == "🎯 تنظیم تارگت":
 
-        await target_menu(update, context)
+        await update.message.reply_text(
+            "مثال:\n/target BTCUSDT 120000"
+        )
+
+    elif text == "📦 حجم بازار":
+
+        await update.message.reply_text(
+            "📦 بخش حجم بازار بزودی حرفه‌ای‌تر می‌شود"
+        )
+
+    elif text == "💧 نقدینگی":
+
+        await update.message.reply_text(
+            "💧 بخش نقدینگی بزودی حرفه‌ای‌تر می‌شود"
+        )
 
 # =====================================
 # RUN
@@ -487,6 +621,12 @@ app.add_handler(CallbackQueryHandler(button_handler))
 
 threading.Thread(
     target=target_checker,
+    args=(app,),
+    daemon=True
+).start()
+
+threading.Thread(
+    target=rsi_target_checker,
     args=(app,),
     daemon=True
 ).start()
