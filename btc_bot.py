@@ -15,89 +15,82 @@ from telegram.ext import (
 )
 
 from tradingview_ta import TA_Handler, Interval
-
 import asyncio
 import threading
 import time
 
-# =====================================
-# TOKEN
-# =====================================
+# =========================
+# 🔑 TOKEN
+# =========================
 
 BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 
-CHAT_ID = "369031827"
-
-# =====================================
-# COINS
-# =====================================
+# =========================
+# 💎 COINS
+# =========================
 
 COINS = {
-    "BTCUSDT": ("BINANCE", "BTCUSDT"),
-    "ETHUSDT": ("BINANCE", "ETHUSDT"),
-    "BNBUSDT": ("BINANCE", "BNBUSDT"),
-    "SOLUSDT": ("BINANCE", "SOLUSDT"),
-    "XRPUSDT": ("BINANCE", "XRPUSDT"),
-    "DOGEUSDT": ("BINANCE", "DOGEUSDT"),
-    "ADAUSDT": ("BINANCE", "ADAUSDT"),
-    "TRXUSDT": ("BINANCE", "TRXUSDT"),
-    "ZECUSDT": ("BINANCE", "ZECUSDT"),
-    "HYPEUSDT": ("MEXC", "HYPEUSDT"),
-    "UBUSDT": ("MEXC", "UBUSDT"),
-    "XAUUSD": ("OANDA", "XAUUSD"),
-    "XAGUSD": ("OANDA", "XAGUSD"),
-    "USDT": ("CRYPTOCAP", "USDT")
+    "🟡 BTC": ("BINANCE", "BTCUSDT"),
+    "🔵 ETH": ("BINANCE", "ETHUSDT"),
+    "🟠 BNB": ("BINANCE", "BNBUSDT"),
+    "🟢 SOL": ("BINANCE", "SOLUSDT"),
+    "🔴 XRP": ("BINANCE", "XRPUSDT"),
+    "⚫ DOGE": ("BINANCE", "DOGEUSDT"),
+    "🟣 ADA": ("BINANCE", "ADAUSDT"),
+    "🔶 TRX": ("BINANCE", "TRXUSDT"),
+    "💎 ZEC": ("BINANCE", "ZECUSDT"),
+    "🔥 HYPE": ("MEXC", "HYPEUSDT"),
+    "🧠 UB": ("MEXC", "UBUSDT"),
+    "🥇 GOLD": ("OANDA", "XAUUSD"),
+    "🥈 SILVER": ("OANDA", "XAGUSD"),
+    "💵 USDT": ("CRYPTOCAP", "USDT")
 }
 
-# =====================================
-# TIMEFRAMES
-# =====================================
+# =========================
+# ⏱ TIMEFRAMES
+# =========================
 
 TIMEFRAMES = {
+    "5m": Interval.INTERVAL_5_MINUTES,
     "15m": Interval.INTERVAL_15_MINUTES,
     "4h": Interval.INTERVAL_4_HOURS,
     "1d": Interval.INTERVAL_1_DAY
 }
 
-# =====================================
-# STORAGE
-# =====================================
+# =========================
+# 📦 STORAGE
+# =========================
 
 user_targets = {}
 rsi_targets = {}
+ema_cache = {}
+divergence_cache = {}
 
-MAX_ALERTS = 3
-
-# =====================================
-# MENU
-# =====================================
+# =========================
+# 🎛 MENU
+# =========================
 
 main_keyboard = ReplyKeyboardMarkup(
     [
         ["🚀 شروع ربات"],
-        ["💰 قیمت لحظه‌ای"],
-        ["📊 سیگنال"],
-        ["📈 اندیکاتور RSI"],
-        ["🎯 تارگت RSI"],
-        ["📦 حجم بازار"],
-        ["💧 نقدینگی"],
-        ["🎯 تنظیم تارگت"]
+        ["💰 قیمت 💰", "📊 سیگنال 📊"],
+        ["📈 RSI 📈", "🎯 RSI TARGET 🎯"],
+        ["📦 VOLUME 📦", "💧 LIQUIDITY 💧"],
+        ["⚡ EMA CROSS ⚡", "🎯 TARGET PRICE 🎯"]
     ],
     resize_keyboard=True
 )
 
-# =====================================
-# ANALYSIS
-# =====================================
+# =========================
+# 🔎 ANALYSIS
+# =========================
 
 def get_analysis(symbol, interval=Interval.INTERVAL_15_MINUTES):
 
     try:
-
         exchange, tv_symbol = COINS[symbol]
 
         screener = "crypto"
-
         if exchange == "OANDA":
             screener = "forex"
 
@@ -110,76 +103,61 @@ def get_analysis(symbol, interval=Interval.INTERVAL_15_MINUTES):
 
         return handler.get_analysis()
 
-    except Exception as e:
-
-        print("ERROR:", e)
-
+    except:
         return None
 
-# =====================================
-# PRICE
-# =====================================
+# =========================
+# 💰 PRICE
+# =========================
 
 def get_price(symbol):
-
     analysis = get_analysis(symbol)
-
     if analysis:
-
         return analysis.indicators.get("close")
-
     return None
 
-# =====================================
-# ALERT
-# =====================================
+# =========================
+# 🔔 ALERT SYSTEM
+# =========================
 
 def send_multi_alert(app, text):
 
     try:
-
-        for i in range(MAX_ALERTS):
-
+        for i in range(3):
             asyncio.run(
                 app.bot.send_message(
-                    chat_id=CHAT_ID,
+                    chat_id="369031827",
                     text=f"{text}\n\n🔔 Alert {i+1}"
                 )
             )
-
             time.sleep(2)
 
-    except Exception as e:
+    except:
+        pass
 
-        print("ALERT ERROR:", e)
-
-# =====================================
-# MENUS
-# =====================================
+# =========================
+# 🧭 MENU BUILDER
+# =========================
 
 def coin_menu(prefix):
 
     buttons = []
-
     row = []
 
-    for symbol in COINS.keys():
+    for icon_symbol in COINS.keys():
 
         row.append(
             InlineKeyboardButton(
-                symbol,
-                callback_data=f"{prefix}_{symbol}"
+                icon_symbol,
+                callback_data=f"{prefix}_{icon_symbol}"
             )
         )
 
         if len(row) == 2:
-
             buttons.append(row)
-
             row = []
 
     if row:
-
         buttons.append(row)
 
     return InlineKeyboardMarkup(buttons)
@@ -188,453 +166,187 @@ def timeframe_menu(prefix, symbol):
 
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(
-                "15m",
-                callback_data=f"{prefix}_{symbol}_15m"
-            ),
-
-            InlineKeyboardButton(
-                "4H",
-                callback_data=f"{prefix}_{symbol}_4h"
-            )
+            InlineKeyboardButton("⚡5m", callback_data=f"{prefix}_{symbol}_5m"),
+            InlineKeyboardButton("🔥15m", callback_data=f"{prefix}_{symbol}_15m")
         ],
-
         [
-            InlineKeyboardButton(
-                "1D",
-                callback_data=f"{prefix}_{symbol}_1d"
-            )
+            InlineKeyboardButton("🌊4h", callback_data=f"{prefix}_{symbol}_4h"),
+            InlineKeyboardButton("🌙1D", callback_data=f"{prefix}_{symbol}_1d")
         ]
     ])
 
-# =====================================
-# START
-# =====================================
+# =========================
+# 🚀 START
+# =========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = (
-        "🤖 ربات حرفه‌ای کریپتو فعال شد\n\n"
-        "✅ قیمت لحظه‌ای\n"
-        "✅ سیگنال حرفه‌ای\n"
-        "✅ RSI\n"
-        "✅ تارگت RSI\n"
-        "✅ حجم خرید و فروش\n"
-        "✅ نقدینگی\n"
-        "✅ تارگت قیمت\n"
-        "✅ طلا و نقره\n"
-        "✅ تایم فریم 15m / 4h / 1d"
-    )
-
     await update.message.reply_text(
-        text,
+        "🤖 ربات حرفه‌ای فعال شد 🚀\n\n"
+        "💰 قیمت\n📊 سیگنال\n📈 RSI\n🎯 RSI TARGET\n⚡ EMA CROSS\n📦 VOLUME\n💧 LIQUIDITY",
         reply_markup=main_keyboard
     )
 
-# =====================================
-# TARGET
-# =====================================
+# =========================
+# 🎯 TARGET PRICE
+# =========================
 
 async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
-
-        symbol = context.args[0].upper()
-
+        symbol = context.args[0]
         price = float(context.args[1])
 
         user_targets[symbol] = price
 
         await update.message.reply_text(
-            f"✅ تارگت ثبت شد\n\n"
-            f"{symbol} → {price}"
+            f"🎯 Target Set\n💎 {symbol} → {price}"
         )
 
     except:
+        await update.message.reply_text("مثال: /target BTCUSDT 70000")
 
-        await update.message.reply_text(
-            "❌ مثال:\n/target BTCUSDT 120000"
-        )
-
-# =====================================
-# TARGET CHECKER
-# =====================================
-
-def target_checker(app):
-
-    while True:
-
-        try:
-
-            for symbol, target_price in list(user_targets.items()):
-
-                current_price = get_price(symbol)
-
-                if current_price is None:
-                    continue
-
-                if current_price >= target_price:
-
-                    send_multi_alert(
-                        app,
-                        f"🎯 TARGET HIT\n\n"
-                        f"{symbol}\n"
-                        f"💰 {current_price}"
-                    )
-
-                    del user_targets[symbol]
-
-            time.sleep(30)
-
-        except Exception as e:
-
-            print("TARGET ERROR:", e)
-
-            time.sleep(30)
-
-# =====================================
-# RSI TARGET CHECKER
-# =====================================
-
-def rsi_target_checker(app):
-
-    while True:
-
-        try:
-
-            for key, target in list(rsi_targets.items()):
-
-                parts = key.split("_")
-
-                symbol = parts[0]
-
-                tf = parts[1]
-
-                analysis = get_analysis(
-                    symbol,
-                    TIMEFRAMES[tf]
-                )
-
-                if analysis is None:
-                    continue
-
-                rsi = analysis.indicators.get("RSI")
-
-                if rsi is None:
-                    continue
-
-                if rsi >= target:
-
-                    send_multi_alert(
-                        app,
-                        f"🎯 RSI TARGET HIT\n\n"
-                        f"{symbol}\n"
-                        f"⏰ {tf}\n"
-                        f"📈 RSI: {rsi:.2f}"
-                    )
-
-                    del rsi_targets[key]
-
-            time.sleep(20)
-
-        except Exception as e:
-
-            print("RSI TARGET ERROR:", e)
-
-            time.sleep(20)
-
-# =====================================
-# BUTTONS
-# =====================================
+# =========================
+# 📊 HANDLER
+# =========================
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
-
     await query.answer()
 
     data = query.data
 
-    # PRICE
-
-    if data.startswith("price_"):
-
-        symbol = data.replace("price_", "")
-
-        price = get_price(symbol)
-
-        if price is None:
-
-            await query.edit_message_text(
-                "❌ موردی یافت نشد"
-            )
-
-            return
-
-        await query.edit_message_text(
-            f"💰 {symbol}\n\n"
-            f"📌 قیمت لحظه‌ای:\n{price}"
-        )
-
-    # SIGNAL
-
-    elif data.startswith("signal_") and "_15m" not in data and "_4h" not in data and "_1d" not in data:
-
-        symbol = data.replace("signal_", "")
-
-        await query.edit_message_text(
-            f"⏰ تایم فریم {symbol}",
-            reply_markup=timeframe_menu("signal", symbol)
-        )
-
-    elif data.startswith("signal_"):
-
-        parts = data.split("_")
-
-        symbol = parts[1]
-
-        tf = parts[2]
-
-        analysis = get_analysis(
-            symbol,
-            TIMEFRAMES[tf]
-        )
-
-        if analysis is None:
-
-            await query.edit_message_text(
-                "❌ خطا"
-            )
-
-            return
-
-        summary = analysis.summary
-
-        text = (
-            f"📊 {symbol}\n\n"
-            f"⏰ تایم فریم: {tf}\n\n"
-            f"📡 وضعیت: {summary['RECOMMENDATION']}\n\n"
-            f"🟢 BUY: {summary['BUY']}\n"
-            f"🔴 SELL: {summary['SELL']}\n"
-            f"⚪ NEUTRAL: {summary['NEUTRAL']}"
-        )
-
-        await query.edit_message_text(text)
-
     # RSI
+    if data.startswith("rsi_"):
 
-    elif data.startswith("rsi_") and "_15m" not in data and "_4h" not in data and "_1d" not in data:
+        symbol = data.split("_")[1]
+        tf = data.split("_")[2]
 
-        symbol = data.replace("rsi_", "")
-
-        await query.edit_message_text(
-            f"⏰ تایم فریم RSI {symbol}",
-            reply_markup=timeframe_menu("rsi", symbol)
-        )
-
-    elif data.startswith("rsi_"):
-
-        parts = data.split("_")
-
-        symbol = parts[1]
-
-        tf = parts[2]
-
-        analysis = get_analysis(
-            symbol,
-            TIMEFRAMES[tf]
-        )
-
-        if analysis is None:
-
-            await query.edit_message_text(
-                "❌ خطا"
-            )
-
-            return
-
+        analysis = get_analysis(symbol, TIMEFRAMES[tf])
         rsi = analysis.indicators["RSI"]
 
-        status = "⚪ خنثی"
-
+        status = "⚪"
         if rsi >= 70:
-            status = "🔴 اشباع خرید"
-
+            status = "🔴 Overbought"
         elif rsi <= 30:
-            status = "🟢 اشباع فروش"
-
-        elif 45 <= rsi <= 55:
-            status = "🟡 نزدیک RSI 50"
-
-        text = (
-            f"📈 RSI {symbol}\n\n"
-            f"⏰ تایم فریم: {tf}\n\n"
-            f"📌 RSI: {rsi:.2f}\n\n"
-            f"📡 وضعیت:\n{status}"
-        )
-
-        await query.edit_message_text(text)
-
-    # RSI TARGET
-
-    elif data.startswith("rsitarget_") and "_15m" not in data and "_4h" not in data and "_1d" not in data:
-
-        symbol = data.replace("rsitarget_", "")
+            status = "🟢 Oversold"
 
         await query.edit_message_text(
-            f"⏰ تایم فریم RSI Target {symbol}",
-            reply_markup=timeframe_menu("rsitarget", symbol)
+            f"📈 RSI {symbol}\n⏱ {tf}\n\n📊 RSI: {rsi:.2f}\n{status}"
         )
 
-    elif data.startswith("rsitarget_"):
+# =========================
+# 🧠 EMA CROSS
+# =========================
 
-        parts = data.split("_")
+def ema_checker(app):
 
-        symbol = parts[1]
+    while True:
 
-        tf = parts[2]
+        try:
 
-        context.user_data["rsi_symbol"] = symbol
+            for symbol in COINS.keys():
 
-        context.user_data["rsi_tf"] = tf
+                analysis = get_analysis(symbol)
 
-        await query.message.reply_text(
-            "📌 عدد RSI را ارسال کن\nمثال:\n70"
-        )
+                ema20 = analysis.indicators.get("EMA20")
+                ema50 = analysis.indicators.get("EMA50")
 
-# =====================================
-# SAVE RSI TARGET
-# =====================================
+                if not ema20 or not ema50:
+                    continue
 
-async def save_rsi_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+                state = ema20 > ema50
+                old = ema_cache.get(symbol)
 
-    try:
+                if old is not None:
 
-        value = float(update.message.text)
+                    if state and not old:
+                        send_multi_alert(app, f"🟢 GOLDEN CROSS 💎 {symbol}")
 
-        symbol = context.user_data.get("rsi_symbol")
+                    elif not state and old:
+                        send_multi_alert(app, f"🔴 DEATH CROSS 💎 {symbol}")
 
-        tf = context.user_data.get("rsi_tf")
+                ema_cache[symbol] = state
 
-        if not symbol or not tf:
-            return
+            time.sleep(60)
 
-        key = f"{symbol}_{tf}"
+        except:
+            time.sleep(60)
 
-        rsi_targets[key] = value
+# =========================
+# 📉 RSI DIVERGENCE
+# =========================
 
-        await update.message.reply_text(
-            f"✅ تارگت RSI ثبت شد\n\n"
-            f"{symbol}\n"
-            f"⏰ {tf}\n"
-            f"📈 {value}"
-        )
+def divergence_checker(app):
 
-        context.user_data.clear()
+    while True:
 
-    except:
+        try:
 
-        pass
+            for symbol in COINS.keys():
 
-# =====================================
-# TEXT HANDLER
-# =====================================
+                analysis = get_analysis(symbol, Interval.INTERVAL_4_HOURS)
+
+                rsi = analysis.indicators.get("RSI")
+                price = analysis.indicators.get("close")
+
+                key = symbol
+
+                old = divergence_cache.get(key)
+
+                if old:
+
+                    if price > old["price"] and rsi < old["rsi"]:
+                        send_multi_alert(app, f"🔴 Bearish Divergence 💎 {symbol}")
+
+                    if price < old["price"] and rsi > old["rsi"]:
+                        send_multi_alert(app, f"🟢 Bullish Divergence 💎 {symbol}")
+
+                divergence_cache[key] = {"price": price, "rsi": rsi}
+
+            time.sleep(180)
+
+        except:
+            time.sleep(180)
+
+# =========================
+# 💬 TEXT HANDLER
+# =========================
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if "rsi_symbol" in context.user_data:
-
-        await save_rsi_target(update, context)
-
-        return
 
     text = update.message.text
 
     if text == "🚀 شروع ربات":
-
         await start(update, context)
 
-    elif text == "💰 قیمت لحظه‌ای":
+    elif text == "📈 RSI 📈":
+        await update.message.reply_text("انتخاب ارز:", reply_markup=coin_menu("rsi"))
 
-        await update.message.reply_text(
-            "💰 انتخاب ارز:",
-            reply_markup=coin_menu("price")
-        )
+    elif text == "🎯 RSI TARGET 🎯":
+        await update.message.reply_text("انتخاب ارز:", reply_markup=coin_menu("rsitarget"))
 
-    elif text == "📊 سیگنال":
+    elif text == "📊 سیگنال 📊":
+        await update.message.reply_text("انتخاب ارز:", reply_markup=coin_menu("signal"))
 
-        await update.message.reply_text(
-            "📊 انتخاب ارز:",
-            reply_markup=coin_menu("signal")
-        )
+    elif text == "💰 قیمت 💰":
+        await update.message.reply_text("انتخاب ارز:", reply_markup=coin_menu("price"))
 
-    elif text == "📈 اندیکاتور RSI":
-
-        await update.message.reply_text(
-            "📈 انتخاب ارز:",
-            reply_markup=coin_menu("rsi")
-        )
-
-    elif text == "🎯 تارگت RSI":
-
-        await update.message.reply_text(
-            "🎯 انتخاب ارز:",
-            reply_markup=coin_menu("rsitarget")
-        )
-
-    elif text == "🎯 تنظیم تارگت":
-
-        await update.message.reply_text(
-            "مثال:\n/target BTCUSDT 120000"
-        )
-
-    elif text == "📦 حجم بازار":
-
-        await update.message.reply_text(
-            "📦 بخش حجم بازار بزودی حرفه‌ای‌تر می‌شود"
-        )
-
-    elif text == "💧 نقدینگی":
-
-        await update.message.reply_text(
-            "💧 بخش نقدینگی بزودی حرفه‌ای‌تر می‌شود"
-        )
-
-# =====================================
-# RUN
-# =====================================
+# =========================
+# ▶ RUN
+# =========================
 
 app = Application.builder().token(BOT_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-
 app.add_handler(CommandHandler("target", target))
-
-app.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        text_handler
-    )
-)
-
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 app.add_handler(CallbackQueryHandler(button_handler))
 
-threading.Thread(
-    target=target_checker,
-    args=(app,),
-    daemon=True
-).start()
-
-threading.Thread(
-    target=rsi_target_checker,
-    args=(app,),
-    daemon=True
-).start()
+threading.Thread(target=ema_checker, args=(app,), daemon=True).start()
+threading.Thread(target=divergence_checker, args=(app,), daemon=True).start()
 
 print("BOT RUNNING 🚀")
 
-asyncio.set_event_loop(asyncio.new_event_loop())
-
-app.run_polling(
-    drop_pending_updates=True
-)
+app.run_polling(drop_pending_updates=True)
