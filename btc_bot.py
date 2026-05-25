@@ -24,7 +24,7 @@ import time
 # TOKEN
 # =====================================
 
-BOT_TOKEN = "توکن_ربات_خودت"
+BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 
 CHAT_ID = "369031827"
 
