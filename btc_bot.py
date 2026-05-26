@@ -11,7 +11,7 @@ import threading
 import os
 
 # =========================
-# 🔑 TOKEN (Render ENV)
+# 🔑 TOKEN
 # =========================
 BOT_TOKEN = os.getenv("8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0")
 CHAT_ID = "369031827"
@@ -36,7 +36,7 @@ COINS = {
 exchange = ccxt.binance({"enableRateLimit": True})
 
 # =========================
-# 🗄 DATABASE (ANTI-SPAM)
+# 🗄 DATABASE
 # =========================
 conn = sqlite3.connect("signals.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -91,7 +91,7 @@ def rsi(series, period=14):
     return 100 - (100 / (1 + rs))
 
 # =========================
-# 🔔 SAFE SEND (Render FIX)
+# 🔔 SAFE SEND
 # =========================
 def send(app, text):
     async def _send():
@@ -103,7 +103,7 @@ def send(app, text):
     loop.close()
 
 # =========================
-# ⚡ EMA CROSS ENGINE
+# ⚡ EMA CROSS
 # =========================
 ema_state = {}
 
@@ -215,8 +215,8 @@ def coin_menu():
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 BTC PRO BOT V2.1 ONLINE ⚡\n\n"
-        "📡 EMA CROSS\n📉 RSI DIVERGENCE\n📊 BINANCE LIVE DATA\n🗄 SQLITE ACTIVE",
+        "🤖 BTC BOT V2.1 READY ⚡\n\n"
+        "📡 EMA CROSS\n📉 RSI DIVERGENCE\n📊 LIVE BINANCE DATA\n🗄 SQLITE ACTIVE",
         reply_markup=main_keyboard
     )
 
