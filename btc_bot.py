@@ -356,4 +356,4 @@ threading.Thread(
 
 print("BOT RUNNING 🚀")
 
-app.run_polling(drop_pending_updates=True)
+app.run_polling()
