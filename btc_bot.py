@@ -1,5 +1,3 @@
-import asyncio
-import json
 import requests
 import pandas as pd
 
@@ -7,9 +5,9 @@ from ta.momentum import RSIIndicator
 from ta.trend import EMAIndicator
 
 from telegram import (
+    Update,
     ReplyKeyboardMarkup,
-    KeyboardButton,
-    Update
+    KeyboardButton
 )
 
 from telegram.ext import (
@@ -20,15 +18,15 @@ from telegram.ext import (
     filters
 )
 
-# =====================================
-# TOKEN
-# =====================================
+# =========================================
+# BOT TOKEN
+# =========================================
 
 BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 
-# =====================================
+# =========================================
 # COINS
-# =====================================
+# =========================================
 
 COINS = [
     "BTC",
@@ -42,6 +40,10 @@ COINS = [
     "ZEC"
 ]
 
+# =========================================
+# COINGECKO IDS
+# =========================================
+
 COINGECKO_IDS = {
     "BTC": "bitcoin",
     "ETH": "ethereum",
@@ -54,9 +56,9 @@ COINGECKO_IDS = {
     "ZEC": "zcash"
 }
 
-# =====================================
+# =========================================
 # TIMEFRAMES
-# =====================================
+# =========================================
 
 TIMEFRAMES = {
     "5m": "5min",
@@ -65,83 +67,46 @@ TIMEFRAMES = {
     "1D": "1day"
 }
 
-# =====================================
-# USER STATES
-# =====================================
+# =========================================
+# USER STATE
+# =========================================
 
 user_state = {}
 
-# =====================================
-# ALERT CACHE
-# =====================================
-
-alert_cache = {}
-
-# =====================================
-# MENU
-# =====================================
+# =========================================
+# MAIN MENU
+# =========================================
 
 main_menu = ReplyKeyboardMarkup(
     [
         ["🚀 شروع ربات"],
         ["💰 قیمت لحظه‌ای", "📊 تحلیل بازار"],
         ["📈 RSI", "⚡ EMA کراس"],
-        ["📉 واگرایی RSI", "📦 فشار بازار"],
-        ["🩺 سلامت ربات"]
+        ["📦 فشار بازار", "🩺 سلامت ربات"]
     ],
     resize_keyboard=True
 )
 
-# =====================================
-# START
-# =====================================
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    welcome_message = """
-🚀 به Crypto AI Bot V5 خوش آمدید
-
-📊 ربات تحلیل حرفه‌ای بازار
-
-💰 قیمت لحظه‌ای
-📈 RSI
-⚡ EMA Cross
-📉 واگرایی RSI
-📦 فشار بازار
-🩺 سلامت ربات
-
-🟢 ربات آنلاین است
-"""
-
-    await update.message.reply_text(
-        welcome_message,
-        reply_markup=main_menu
-    )
-
-# =====================================
-# COIN MENU
-# =====================================
+# =========================================
+# COIN KEYBOARD
+# =========================================
 
 def coin_keyboard():
 
     rows = []
-
     row = []
 
     for i, coin in enumerate(COINS, start=1):
 
         row.append(
-            KeyboardButton(coin)
+            KeyboardButton(f"💎 {coin}")
         )
 
         if i % 3 == 0:
-
             rows.append(row)
-
             row = []
 
     if row:
-
         rows.append(row)
 
     return ReplyKeyboardMarkup(
@@ -149,23 +114,23 @@ def coin_keyboard():
         resize_keyboard=True
     )
 
-# =====================================
-# TIMEFRAME MENU
-# =====================================
+# =========================================
+# TIMEFRAME KEYBOARD
+# =========================================
 
 def timeframe_keyboard():
 
     return ReplyKeyboardMarkup(
         [
-            ["5m", "15m"],
-            ["4H", "1D"]
+            ["⏰ 5m", "⏰ 15m"],
+            ["⏰ 4H", "⏰ 1D"]
         ],
         resize_keyboard=True
     )
 
-# =====================================
+# =========================================
 # GET PRICE
-# =====================================
+# =========================================
 
 def get_price(symbol):
 
@@ -186,9 +151,9 @@ def get_price(symbol):
 
         return None
 
-# =====================================
+# =========================================
 # GET KLINES
-# =====================================
+# =========================================
 
 def get_klines(symbol, timeframe):
 
@@ -219,15 +184,15 @@ def get_klines(symbol, timeframe):
 
         return None
 
-# =====================================
+# =========================================
 # RSI
-# =====================================
+# =========================================
 
 def calculate_rsi(symbol, timeframe):
 
     closes = get_klines(symbol, timeframe)
 
-    if not closes:
+    if closes is None:
         return None
 
     df = pd.DataFrame(closes, columns=["close"])
@@ -239,15 +204,15 @@ def calculate_rsi(symbol, timeframe):
 
     return round(rsi.iloc[-1], 2)
 
-# =====================================
+# =========================================
 # EMA CROSS
-# =====================================
+# =========================================
 
 def ema_cross(symbol, timeframe):
 
     closes = get_klines(symbol, timeframe)
 
-    if not closes:
+    if closes is None:
         return "خطا"
 
     df = pd.DataFrame(closes, columns=["close"])
@@ -270,16 +235,16 @@ def ema_cross(symbol, timeframe):
 
         return "🔴 کراس نزولی"
 
-# =====================================
+# =========================================
 # MARKET PRESSURE
-# =====================================
+# =========================================
 
 def market_pressure(symbol, timeframe):
 
     rsi = calculate_rsi(symbol, timeframe)
 
     if rsi is None:
-        return "خطا"
+        return "خطا در دریافت دیتا"
 
     if rsi >= 70:
 
@@ -293,54 +258,103 @@ def market_pressure(symbol, timeframe):
 
         return "⚪ بازار متعادل"
 
-# =====================================
-# BOT HEALTH
-# =====================================
+# =========================================
+# START
+# =========================================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    welcome_message = """
+🚀 به Crypto AI Bot V5 خوش آمدید
+
+━━━━━━━━━━━━━━
+
+📊 ربات تحلیل حرفه‌ای بازار ارز دیجیتال
+
+💰 قیمت لحظه‌ای
+📈 RSI حرفه‌ای
+⚡ کراس EMA
+📦 فشار بازار
+🩺 سلامت ربات
+
+━━━━━━━━━━━━━━
+
+💎 ارزهای پشتیبانی‌شده:
+
+BTC • ETH • BNB • SOL
+XRP • DOGE • ADA • TRX • ZEC
+
+━━━━━━━━━━━━━━
+
+⏰ تایم‌فریم‌ها:
+
+5m • 15m • 4H • 1D
+
+━━━━━━━━━━━━━━
+
+🟢 ربات آنلاین است
+"""
+
+    await update.message.reply_text(
+        welcome_message,
+        reply_markup=main_menu
+    )
+
+# =========================================
+# HEALTH
+# =========================================
 
 async def health(update):
 
     text = """
 🩺 وضعیت سیستم ربات
 
-🟢 ربات آنلاین
-🟢 CoinGecko سالم
-🟢 KuCoin سالم
-🟢 اسکنر فعال
+━━━━━━━━━━━━━━
 
-✅ همه سیستم‌ها سالم هستند
+🤖 وضعیت ربات:
+🟢 آنلاین
+
+📡 CoinGecko:
+🟢 سالم
+
+📊 KuCoin:
+🟢 سالم
+
+━━━━━━━━━━━━━━
+
+✅ همه سیستم‌ها فعال هستند
 """
 
     await update.message.reply_text(text)
 
-# =====================================
+# =========================================
 # MESSAGE HANDLER
-# =====================================
+# =========================================
 
 async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
-
     user_id = update.effective_user.id
 
-    # =================================
+    # =====================================
     # START
-    # =================================
+    # =====================================
 
     if text == "🚀 شروع ربات":
 
         await start(update, context)
 
-    # =================================
+    # =====================================
     # HEALTH
-    # =================================
+    # =====================================
 
     elif text == "🩺 سلامت ربات":
 
         await health(update)
 
-    # =================================
+    # =====================================
     # PRICE
-    # =================================
+    # =====================================
 
     elif text == "💰 قیمت لحظه‌ای":
 
@@ -353,9 +367,9 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
-    # =================================
+    # =====================================
     # RSI
-    # =================================
+    # =====================================
 
     elif text == "📈 RSI":
 
@@ -368,9 +382,9 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
-    # =================================
+    # =====================================
     # EMA
-    # =================================
+    # =====================================
 
     elif text == "⚡ EMA کراس":
 
@@ -383,9 +397,9 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
-    # =================================
+    # =====================================
     # PRESSURE
-    # =================================
+    # =====================================
 
     elif text == "📦 فشار بازار":
 
@@ -398,9 +412,9 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
-    # =================================
+    # =====================================
     # ANALYSIS
-    # =================================
+    # =====================================
 
     elif text == "📊 تحلیل بازار":
 
@@ -413,38 +427,40 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
-    # =================================
+    # =====================================
     # COIN SELECT
-    # =================================
+    # =====================================
 
-    elif text in COINS:
+    elif text.startswith("💎"):
 
-        if user_id not in user_state:
+        coin = text.replace("💎 ", "")
+
+        if coin not in COINS:
             return
 
-        user_state[user_id]["coin"] = text
+        user_state[user_id]["coin"] = coin
 
         await update.message.reply_text(
             "⏰ تایم‌فریم را انتخاب کن:",
             reply_markup=timeframe_keyboard()
         )
 
-    # =================================
+    # =====================================
     # TIMEFRAME SELECT
-    # =================================
+    # =====================================
 
-    elif text in TIMEFRAMES:
+    elif text.startswith("⏰"):
 
-        if user_id not in user_state:
-            return
+        timeframe = text.replace("⏰ ", "")
 
         action = user_state[user_id]["action"]
 
         coin = user_state[user_id]["coin"]
 
-        timeframe = text
-
+        # =================================
         # PRICE
+        # =================================
+
         if action == "price":
 
             price = get_price(coin)
@@ -453,6 +469,8 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""
 💰 قیمت لحظه‌ای
 
+━━━━━━━━━━━━━━
+
 💎 ارز: {coin}
 
 💵 قیمت:
@@ -460,7 +478,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
             )
 
+        # =================================
         # RSI
+        # =================================
+
         elif action == "rsi":
 
             rsi = calculate_rsi(
@@ -482,6 +503,8 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""
 📈 تحلیل RSI
 
+━━━━━━━━━━━━━━
+
 💎 ارز: {coin}
 
 ⏰ تایم‌فریم: {timeframe}
@@ -493,7 +516,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
             )
 
+        # =================================
         # EMA
+        # =================================
+
         elif action == "ema":
 
             result = ema_cross(
@@ -505,6 +531,8 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""
 ⚡ تحلیل EMA
 
+━━━━━━━━━━━━━━
+
 💎 ارز: {coin}
 
 ⏰ تایم‌فریم: {timeframe}
@@ -513,7 +541,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
             )
 
+        # =================================
         # PRESSURE
+        # =================================
+
         elif action == "pressure":
 
             result = market_pressure(
@@ -525,6 +556,8 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""
 📦 فشار بازار
 
+━━━━━━━━━━━━━━
+
 💎 ارز: {coin}
 
 ⏰ تایم‌فریم: {timeframe}
@@ -533,7 +566,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
             )
 
+        # =================================
         # ANALYSIS
+        # =================================
+
         elif action == "analysis":
 
             rsi = calculate_rsi(
@@ -555,6 +591,8 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""
 📊 تحلیل کامل بازار
 
+━━━━━━━━━━━━━━
+
 💎 ارز: {coin}
 
 ⏰ تایم‌فریم: {timeframe}
@@ -572,57 +610,11 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         user_state.pop(user_id)
 
-# =====================================
-# ALERT SCANNER
-# =====================================
-
-async def scanner(app):
-
-    while True:
-
-        try:
-
-            for coin in COINS:
-
-                for timeframe in TIMEFRAMES:
-
-                    rsi = calculate_rsi(
-                        coin,
-                        timeframe
-                    )
-
-                    if rsi is None:
-                        continue
-
-                    key70 = f"{coin}_{timeframe}_70"
-
-                    if rsi >= 70:
-
-                        if not alert_cache.get(key70):
-
-                            print(
-                                f"{coin} RSI 70"
-                            )
-
-                            alert_cache[key70] = True
-
-                    else:
-
-                        alert_cache[key70] = False
-
-            await asyncio.sleep(60)
-
-        except Exception as e:
-
-            print("SCANNER ERROR:", e)
-
-            await asyncio.sleep(30)
-
-# =====================================
+# =========================================
 # MAIN
-# =====================================
+# =========================================
 
-async def main():
+def main():
 
     print("BOT STARTED 🚀")
 
@@ -644,26 +636,14 @@ async def main():
         )
     )
 
-    asyncio.create_task(
-        scanner(app)
-    )
-
     print("BOT RUNNING 🚀")
 
-    await app.initialize()
+    app.run_polling()
 
-    await app.start()
-
-    await app.updater.start_polling()
-
-    while True:
-
-        await asyncio.sleep(60)
-
-# =====================================
+# =========================================
 # RUN
-# =====================================
+# =========================================
 
 if __name__ == "__main__":
 
-    asyncio.run(main())
+    main()
