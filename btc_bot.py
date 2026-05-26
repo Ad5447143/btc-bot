@@ -8,12 +8,11 @@ import sqlite3
 import asyncio
 import time
 import threading
-import os
 
 # =========================
-# 🔑 TOKEN
+# 🔑 BOT TOKEN (SIMPLE MODE)
 # =========================
-BOT_TOKEN = os.getenv("8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0")
+BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 CHAT_ID = "369031827"
 
 # =========================
@@ -36,14 +35,13 @@ COINS = {
 exchange = ccxt.binance({"enableRateLimit": True})
 
 # =========================
-# 🗄 DATABASE
+# 🗄 DATABASE (ANTI DUPLICATE)
 # =========================
 conn = sqlite3.connect("signals.db", check_same_thread=False)
 cursor = conn.cursor()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS signals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol TEXT,
     type TEXT,
     time INTEGER
@@ -61,7 +59,7 @@ def already_sent(symbol, sig_type, cooldown=300):
 
 def save_signal(symbol, sig_type):
     cursor.execute(
-        "INSERT INTO signals (symbol, type, time) VALUES (?, ?, ?)",
+        "INSERT INTO signals VALUES (?, ?, ?)",
         (symbol, sig_type, int(time.time()))
     )
     conn.commit()
@@ -91,7 +89,7 @@ def rsi(series, period=14):
     return 100 - (100 / (1 + rs))
 
 # =========================
-# 🔔 SAFE SEND
+# 🔔 SEND MESSAGE
 # =========================
 def send(app, text):
     async def _send():
@@ -140,12 +138,11 @@ def ema_checker(app):
 
             time.sleep(60)
 
-        except Exception as e:
-            print("EMA ERROR:", e)
+        except:
             time.sleep(10)
 
 # =========================
-# 📉 RSI DIVERGENCE
+# 📉 RSI DIVERGENCE (SIMPLE)
 # =========================
 div_cache = {}
 
@@ -175,20 +172,19 @@ def divergence_checker(app):
 
                     if price > old["price"] and rsi_v < old["rsi"]:
                         if not already_sent(s, "bear_div"):
-                            send(app, f"🔴 BEARISH DIVERGENCE 📉 {s}")
+                            send(app, f"🔴 BEAR DIV 📉 {s}")
                             save_signal(s, "bear_div")
 
                     if price < old["price"] and rsi_v > old["rsi"]:
                         if not already_sent(s, "bull_div"):
-                            send(app, f"🟢 BULLISH DIVERGENCE 📈 {s}")
+                            send(app, f"🟢 BULL DIV 📈 {s}")
                             save_signal(s, "bull_div")
 
                 div_cache[s] = {"price": price, "rsi": rsi_v}
 
             time.sleep(180)
 
-        except Exception as e:
-            print("DIV ERROR:", e)
+        except:
             time.sleep(10)
 
 # =========================
@@ -196,27 +192,19 @@ def divergence_checker(app):
 # =========================
 main_keyboard = ReplyKeyboardMarkup(
     [
-        ["🚀 START BOT ⚡"],
-        ["💰 PRICE 💎", "📊 SIGNALS 📡"],
-        ["📈 RSI 📊"],
-        ["⚡ EMA CROSS ⚡", "📉 DIVERGENCE 📉"]
+        ["🚀 START"],
+        ["⚡ EMA CROSS", "📉 DIVERGENCE"],
+        ["📊 STATUS"]
     ],
     resize_keyboard=True
 )
-
-def coin_menu():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(c, callback_data=c) for c in list(COINS.keys())[i:i+2]]
-        for i in range(0, len(COINS), 2)
-    ])
 
 # =========================
 # 🚀 START
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 BTC BOT V2.1 READY ⚡\n\n"
-        "📡 EMA CROSS\n📉 RSI DIVERGENCE\n📊 LIVE BINANCE DATA\n🗄 SQLITE ACTIVE",
+        "🤖 BTC BOT ONLINE ⚡",
         reply_markup=main_keyboard
     )
 
@@ -226,14 +214,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     t = update.message.text
 
-    if t == "🚀 START BOT ⚡":
+    if t == "🚀 START":
         await start(update, context)
-
-    elif t == "⚡ EMA CROSS ⚡":
-        await update.message.reply_text("Select Coin:", reply_markup=coin_menu())
-
-    elif t == "📉 DIVERGENCE 📉":
-        await update.message.reply_text("Select Coin:", reply_markup=coin_menu())
 
 # =========================
 # ▶ RUN
@@ -246,6 +228,6 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 threading.Thread(target=ema_checker, args=(app,), daemon=True).start()
 threading.Thread(target=divergence_checker, args=(app,), daemon=True).start()
 
-print("BTC BOT V2.1 RUNNING 🚀")
+print("BOT RUNNING 🚀")
 
 app.run_polling(drop_pending_updates=True)
