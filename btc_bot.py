@@ -20,20 +20,21 @@ import ta
 import asyncio
 import threading
 import time
+import requests
 
-# =====================================
-# 🔑 TOKEN
-# =====================================
+# =========================================
+# TOKEN
+# =========================================
 
 BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
 
 CHAT_ID = "369031827"
 
-# =====================================
-# 📡 BINANCE
-# =====================================
+# =========================================
+# EXCHANGES
+# =========================================
 
-exchange = ccxt.binance({
+binance = ccxt.binance({
     "enableRateLimit": True,
     "timeout": 30000,
     "options": {
@@ -41,25 +42,35 @@ exchange = ccxt.binance({
     }
 })
 
-# =====================================
-# 💎 COINS
-# =====================================
+kucoin = ccxt.kucoin({
+    "enableRateLimit": True,
+    "timeout": 30000
+})
 
-COINS = [
-    "BTC/USDT",
-    "ETH/USDT",
-    "BNB/USDT",
-    "SOL/USDT",
-    "XRP/USDT",
-    "DOGE/USDT",
-    "ADA/USDT",
-    "TRX/USDT",
-    "ZEC/USDT"
-]
+bybit = ccxt.bybit({
+    "enableRateLimit": True,
+    "timeout": 30000
+})
 
-# =====================================
-# ⏰ TIMEFRAMES
-# =====================================
+# =========================================
+# COINS
+# =========================================
+
+COINS = {
+    "🟡 BTC": "BTC/USDT",
+    "🔵 ETH": "ETH/USDT",
+    "🟠 BNB": "BNB/USDT",
+    "🟢 SOL": "SOL/USDT",
+    "🔴 XRP": "XRP/USDT",
+    "⚫ DOGE": "DOGE/USDT",
+    "🟣 ADA": "ADA/USDT",
+    "⚡ TRX": "TRX/USDT",
+    "☠️ ZEC": "ZEC/USDT"
+}
+
+# =========================================
+# TIMEFRAMES
+# =========================================
 
 TIMEFRAMES = {
     "5m": "5m",
@@ -68,16 +79,16 @@ TIMEFRAMES = {
     "1d": "1d"
 }
 
-# =====================================
-# 📦 STORAGE
-# =====================================
+# =========================================
+# STORAGE
+# =========================================
 
 ema_cache = {}
 targets = {}
 
-# =====================================
-# 🎛 MENU
-# =====================================
+# =========================================
+# MENU
+# =========================================
 
 main_keyboard = ReplyKeyboardMarkup(
     [
@@ -89,47 +100,159 @@ main_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# =====================================
-# 📥 GET DATA
-# =====================================
+# =========================================
+# COINGECKO PRICE
+# =========================================
+
+def get_coingecko_price(symbol):
+
+    try:
+
+        ids = {
+            "BTC/USDT": "bitcoin",
+            "ETH/USDT": "ethereum",
+            "BNB/USDT": "binancecoin",
+            "SOL/USDT": "solana",
+            "XRP/USDT": "ripple",
+            "DOGE/USDT": "dogecoin",
+            "ADA/USDT": "cardano",
+            "TRX/USDT": "tron",
+            "ZEC/USDT": "zcash"
+        }
+
+        coin_id = ids.get(symbol)
+
+        if not coin_id:
+            return None
+
+        url = "https://api.coingecko.com/api/v3/simple/price"
+
+        r = requests.get(
+            url,
+            params={
+                "ids": coin_id,
+                "vs_currencies": "usd"
+            },
+            timeout=10
+        )
+
+        data = r.json()
+
+        return data[coin_id]["usd"]
+
+    except Exception as e:
+
+        print("COINGECKO ERROR:", e)
+
+        return None
+
+# =========================================
+# FETCH OHLCV
+# =========================================
 
 def get_ohlcv(symbol, timeframe):
 
-    for attempt in range(3):
+    # =========================
+    # BINANCE
+    # =========================
 
-        try:
+    try:
 
-            bars = exchange.fetch_ohlcv(
-                symbol,
-                timeframe=timeframe,
-                limit=200
-            )
+        bars = binance.fetch_ohlcv(
+            symbol,
+            timeframe=timeframe,
+            limit=120
+        )
 
-            df = pd.DataFrame(
-                bars,
-                columns=[
-                    "time",
-                    "open",
-                    "high",
-                    "low",
-                    "close",
-                    "volume"
-                ]
-            )
+        time.sleep(0.2)
 
-            return df
+        df = pd.DataFrame(
+            bars,
+            columns=[
+                "time",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
+            ]
+        )
 
-        except Exception as e:
+        return df
 
-            print(f"FETCH ERROR {symbol}: ", e)
+    except Exception as e:
 
-            time.sleep(3)
+        print("BINANCE FAIL:", e)
+
+    # =========================
+    # BYBIT
+    # =========================
+
+    try:
+
+        bars = bybit.fetch_ohlcv(
+            symbol,
+            timeframe=timeframe,
+            limit=120
+        )
+
+        time.sleep(0.2)
+
+        df = pd.DataFrame(
+            bars,
+            columns=[
+                "time",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
+            ]
+        )
+
+        return df
+
+    except Exception as e:
+
+        print("BYBIT FAIL:", e)
+
+    # =========================
+    # KUCOIN
+    # =========================
+
+    try:
+
+        bars = kucoin.fetch_ohlcv(
+            symbol,
+            timeframe=timeframe,
+            limit=120
+        )
+
+        time.sleep(0.2)
+
+        df = pd.DataFrame(
+            bars,
+            columns=[
+                "time",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
+            ]
+        )
+
+        return df
+
+    except Exception as e:
+
+        print("KUCOIN FAIL:", e)
 
     return None
 
-# =====================================
-# 📊 ANALYSIS
-# =====================================
+# =========================================
+# ANALYZE
+# =========================================
 
 def analyze(symbol, timeframe):
 
@@ -161,12 +284,23 @@ def analyze(symbol, timeframe):
 
         last = df.iloc[-1]
 
+        # SIGNAL
+
+        signal = "⚪ NEUTRAL"
+
+        if last["ema20"] > last["ema50"] and last["rsi"] > 55:
+            signal = "🟢 BUY"
+
+        elif last["ema20"] < last["ema50"] and last["rsi"] < 45:
+            signal = "🔴 SELL"
+
         return {
-            "price": last["close"],
-            "ema20": last["ema20"],
-            "ema50": last["ema50"],
-            "rsi": last["rsi"],
-            "volume": last["volume"]
+            "price": float(last["close"]),
+            "ema20": float(last["ema20"]),
+            "ema50": float(last["ema50"]),
+            "rsi": float(last["rsi"]),
+            "volume": float(last["volume"]),
+            "signal": signal
         }
 
     except Exception as e:
@@ -175,9 +309,9 @@ def analyze(symbol, timeframe):
 
         return None
 
-# =====================================
-# 🔔 ALERT
-# =====================================
+# =========================================
+# SEND ALERT
+# =========================================
 
 async def send_alert(app, text):
 
@@ -192,9 +326,9 @@ async def send_alert(app, text):
 
         print("ALERT ERROR:", e)
 
-# =====================================
-# 🧭 COIN MENU
-# =====================================
+# =========================================
+# COIN MENU
+# =========================================
 
 def coin_menu(prefix):
 
@@ -202,12 +336,12 @@ def coin_menu(prefix):
 
     row = []
 
-    for coin in COINS:
+    for label, symbol in COINS.items():
 
         row.append(
             InlineKeyboardButton(
-                coin,
-                callback_data=f"{prefix}_{coin}"
+                label,
+                callback_data=f"{prefix}|{symbol}"
             )
         )
 
@@ -222,9 +356,9 @@ def coin_menu(prefix):
 
     return InlineKeyboardMarkup(buttons)
 
-# =====================================
-# ⏱ TIMEFRAME MENU
-# =====================================
+# =========================================
+# TIMEFRAME MENU
+# =========================================
 
 def timeframe_menu(prefix, symbol):
 
@@ -232,31 +366,31 @@ def timeframe_menu(prefix, symbol):
         [
             InlineKeyboardButton(
                 "⚡5m",
-                callback_data=f"{prefix}_{symbol}_5m"
+                callback_data=f"{prefix}|{symbol}|5m"
             ),
 
             InlineKeyboardButton(
                 "🔥15m",
-                callback_data=f"{prefix}_{symbol}_15m"
+                callback_data=f"{prefix}|{symbol}|15m"
             )
         ],
 
         [
             InlineKeyboardButton(
                 "🌊4H",
-                callback_data=f"{prefix}_{symbol}_4h"
+                callback_data=f"{prefix}|{symbol}|4h"
             ),
 
             InlineKeyboardButton(
                 "🌙1D",
-                callback_data=f"{prefix}_{symbol}_1d"
+                callback_data=f"{prefix}|{symbol}|1d"
             )
         ]
     ])
 
-# =====================================
-# 🚀 START
-# =====================================
+# =========================================
+# START
+# =========================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -265,9 +399,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_keyboard
     )
 
-# =====================================
-# 🎯 TARGET
-# =====================================
+# =========================================
+# TARGET
+# =========================================
 
 async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -280,18 +414,20 @@ async def target(update: Update, context: ContextTypes.DEFAULT_TYPE):
         targets[symbol] = price
 
         await update.message.reply_text(
-            f"🎯 تارگت ثبت شد\n\n{symbol} → {price}"
+            f"🎯 تارگت ثبت شد\n\n"
+            f"{symbol} → {price}"
         )
 
     except:
 
         await update.message.reply_text(
-            "مثال:\n/target BTC/USDT 120000"
+            "مثال:\n"
+            "/target BTC/USDT 120000"
         )
 
-# =====================================
-# 🔘 BUTTON HANDLER
-# =====================================
+# =========================================
+# BUTTON HANDLER
+# =========================================
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -301,15 +437,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
 
+    # =====================================
     # PRICE
+    # =====================================
 
-    if data.startswith("price_"):
+    if data.startswith("price|"):
 
-        symbol = data.replace("price_", "")
+        symbol = data.split("|")[1]
 
         result = analyze(symbol, "15m")
 
-        if result is None:
+        price = None
+
+        if result:
+            price = result["price"]
+
+        if price is None:
+            price = get_coingecko_price(symbol)
+
+        if price is None:
 
             await query.edit_message_text(
                 "❌ خطا در دریافت دیتا"
@@ -318,35 +464,39 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         text = (
-            f"💰 PRICE\n\n"
+            f"💰 قیمت لحظه‌ای\n\n"
             f"💎 {symbol}\n\n"
-            f"📌 {result['price']}"
+            f"📌 {price}"
         )
 
         await query.edit_message_text(text)
 
+    # =====================================
     # RSI MENU
+    # =====================================
 
     elif (
-        data.startswith("rsi_")
-        and "_5m" not in data
-        and "_15m" not in data
-        and "_4h" not in data
-        and "_1d" not in data
+        data.startswith("rsi|")
+        and "|5m" not in data
+        and "|15m" not in data
+        and "|4h" not in data
+        and "|1d" not in data
     ):
 
-        symbol = data.replace("rsi_", "")
+        symbol = data.split("|")[1]
 
         await query.edit_message_text(
-            f"📈 RSI {symbol}",
+            f"📈 RSI\n\n💎 {symbol}",
             reply_markup=timeframe_menu("rsi", symbol)
         )
 
+    # =====================================
     # RSI RESULT
+    # =====================================
 
-    elif data.startswith("rsi_"):
+    elif data.startswith("rsi|"):
 
-        parts = data.split("_")
+        parts = data.split("|")
 
         symbol = parts[1]
 
@@ -382,9 +532,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text)
 
-# =====================================
-# ⚡ EMA CROSS
-# =====================================
+# =========================================
+# EMA CROSS ALERT
+# =========================================
 
 def ema_cross_checker(app):
 
@@ -392,7 +542,7 @@ def ema_cross_checker(app):
 
         try:
 
-            for symbol in COINS:
+            for symbol in COINS.values():
 
                 result = analyze(symbol, "15m")
 
@@ -415,7 +565,7 @@ def ema_cross_checker(app):
                             send_alert(
                                 app,
                                 f"🟢 GOLDEN CROSS\n\n"
-                                f"{symbol}"
+                                f"💎 {symbol}"
                             )
                         )
 
@@ -425,13 +575,13 @@ def ema_cross_checker(app):
                             send_alert(
                                 app,
                                 f"🔴 DEATH CROSS\n\n"
-                                f"{symbol}"
+                                f"💎 {symbol}"
                             )
                         )
 
                 ema_cache[symbol] = current
 
-            time.sleep(60)
+            time.sleep(180)
 
         except Exception as e:
 
@@ -439,9 +589,51 @@ def ema_cross_checker(app):
 
             time.sleep(60)
 
-# =====================================
-# ❤️ KEEP ALIVE
-# =====================================
+# =========================================
+# TARGET CHECKER
+# =========================================
+
+def target_checker(app):
+
+    while True:
+
+        try:
+
+            for symbol, target_price in targets.items():
+
+                result = analyze(symbol, "15m")
+
+                if result is None:
+                    continue
+
+                price = result["price"]
+
+                if price >= target_price:
+
+                    asyncio.run(
+                        send_alert(
+                            app,
+                            f"🎯 TARGET HIT\n\n"
+                            f"💎 {symbol}\n"
+                            f"📌 {price}"
+                        )
+                    )
+
+                    del targets[symbol]
+
+                    break
+
+            time.sleep(120)
+
+        except Exception as e:
+
+            print("TARGET ERROR:", e)
+
+            time.sleep(60)
+
+# =========================================
+# KEEP ALIVE
+# =========================================
 
 def keep_alive():
 
@@ -451,9 +643,9 @@ def keep_alive():
 
         time.sleep(300)
 
-# =====================================
-# 💬 TEXT HANDLER
-# =====================================
+# =========================================
+# TEXT HANDLER
+# =========================================
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -477,9 +669,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_menu("rsi")
         )
 
-# =====================================
-# ▶ RUN
-# =====================================
+# =========================================
+# RUN
+# =========================================
 
 app = Application.builder().token(BOT_TOKEN).build()
 
@@ -500,6 +692,12 @@ app.add_handler(
 
 threading.Thread(
     target=ema_cross_checker,
+    args=(app,),
+    daemon=True
+).start()
+
+threading.Thread(
+    target=target_checker,
     args=(app,),
     daemon=True
 ).start()
