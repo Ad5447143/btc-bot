@@ -1,3 +1,5 @@
+import json
+import os
 import requests
 import pandas as pd
 
@@ -74,6 +76,31 @@ TIMEFRAMES = {
 user_state = {}
 
 # =========================================
+# ALERT CACHE
+# =========================================
+
+alert_cache = {}
+
+# =========================================
+# JSON FILES
+# =========================================
+
+TARGETS_FILE = "targets.json"
+RSI_TARGETS_FILE = "rsi_targets.json"
+
+# =========================================
+# CREATE JSON FILES
+# =========================================
+
+for file_name in [TARGETS_FILE, RSI_TARGETS_FILE]:
+
+    if not os.path.exists(file_name):
+
+        with open(file_name, "w") as f:
+
+            json.dump({}, f)
+
+# =========================================
 # MAIN MENU
 # =========================================
 
@@ -82,7 +109,8 @@ main_menu = ReplyKeyboardMarkup(
         ["🚀 شروع ربات"],
         ["💰 قیمت لحظه‌ای", "📊 تحلیل بازار"],
         ["📈 RSI", "⚡ EMA کراس"],
-        ["📦 فشار بازار", "🩺 سلامت ربات"]
+        ["📉 واگرایی RSI", "📦 فشار بازار"],
+        ["🩺 سلامت ربات"]
     ],
     resize_keyboard=True
 )
@@ -103,6 +131,7 @@ def coin_keyboard():
         )
 
         if i % 3 == 0:
+
             rows.append(row)
             row = []
 
@@ -127,6 +156,26 @@ def timeframe_keyboard():
         ],
         resize_keyboard=True
     )
+
+# =========================================
+# LOAD JSON
+# =========================================
+
+def load_json(file_name):
+
+    with open(file_name, "r") as f:
+
+        return json.load(f)
+
+# =========================================
+# SAVE JSON
+# =========================================
+
+def save_json(file_name, data):
+
+    with open(file_name, "w") as f:
+
+        json.dump(data, f, indent=4)
 
 # =========================================
 # GET PRICE
@@ -244,7 +293,7 @@ def market_pressure(symbol, timeframe):
     rsi = calculate_rsi(symbol, timeframe)
 
     if rsi is None:
-        return "خطا در دریافت دیتا"
+        return "خطا"
 
     if rsi >= 70:
 
@@ -259,36 +308,66 @@ def market_pressure(symbol, timeframe):
         return "⚪ بازار متعادل"
 
 # =========================================
+# RSI DIVERGENCE
+# =========================================
+
+def detect_divergence(symbol, timeframe):
+
+    closes = get_klines(symbol, timeframe)
+
+    if closes is None or len(closes) < 30:
+        return None
+
+    df = pd.DataFrame(closes, columns=["close"])
+
+    rsi = RSIIndicator(
+        close=df["close"],
+        window=14
+    ).rsi()
+
+    if (
+        df["close"].iloc[-1] < df["close"].iloc[-5]
+        and
+        rsi.iloc[-1] > rsi.iloc[-5]
+    ):
+
+        return "🟢 واگرایی مثبت RSI"
+
+    elif (
+        df["close"].iloc[-1] > df["close"].iloc[-5]
+        and
+        rsi.iloc[-1] < rsi.iloc[-5]
+    ):
+
+        return "🔴 واگرایی منفی RSI"
+
+    return None
+
+# =========================================
 # START
 # =========================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    welcome_message = """
-🚀 به Crypto AI Bot V5 خوش آمدید
+    text = """
+🚀 به Crypto AI Bot V6 خوش آمدید
 
 ━━━━━━━━━━━━━━
 
-📊 ربات تحلیل حرفه‌ای بازار ارز دیجیتال
-
 💰 قیمت لحظه‌ای
 📈 RSI حرفه‌ای
-⚡ کراس EMA
+⚡ EMA Cross
+📉 واگرایی RSI
 📦 فشار بازار
 🩺 سلامت ربات
 
 ━━━━━━━━━━━━━━
 
-💎 ارزهای پشتیبانی‌شده:
+🤖 اسکنر خودکار فعال است
 
-BTC • ETH • BNB • SOL
-XRP • DOGE • ADA • TRX • ZEC
-
-━━━━━━━━━━━━━━
-
-⏰ تایم‌فریم‌ها:
-
-5m • 15m • 4H • 1D
+✅ هشدار EMA
+✅ هشدار RSI
+✅ هشدار واگرایی
 
 ━━━━━━━━━━━━━━
 
@@ -296,7 +375,7 @@ XRP • DOGE • ADA • TRX • ZEC
 """
 
     await update.message.reply_text(
-        welcome_message,
+        text,
         reply_markup=main_menu
     )
 
@@ -307,11 +386,11 @@ XRP • DOGE • ADA • TRX • ZEC
 async def health(update):
 
     text = """
-🩺 وضعیت سیستم ربات
+🩺 وضعیت کامل ربات
 
 ━━━━━━━━━━━━━━
 
-🤖 وضعیت ربات:
+🤖 ربات:
 🟢 آنلاین
 
 📡 CoinGecko:
@@ -320,12 +399,142 @@ async def health(update):
 📊 KuCoin:
 🟢 سالم
 
+📈 اسکنر RSI:
+🟢 فعال
+
+⚡ اسکنر EMA:
+🟢 فعال
+
+📉 اسکنر واگرایی:
+🟢 فعال
+
+🔔 هشدارها:
+🟢 فعال
+
 ━━━━━━━━━━━━━━
 
-✅ همه سیستم‌ها فعال هستند
+✅ همه سیستم‌ها سالم هستند
 """
 
     await update.message.reply_text(text)
+
+# =========================================
+# AUTO SCANNER
+# =========================================
+
+async def market_scanner(context):
+
+    print("SCANNER RUNNING...")
+
+    app = context.application
+
+    for coin in COINS:
+
+        for timeframe in TIMEFRAMES:
+
+            try:
+
+                # =====================
+                # RSI
+                # =====================
+
+                rsi = calculate_rsi(
+                    coin,
+                    timeframe
+                )
+
+                if rsi is None:
+                    continue
+
+                # =====================
+                # EMA
+                # =====================
+
+                ema = ema_cross(
+                    coin,
+                    timeframe
+                )
+
+                ema_key = f"{coin}_{timeframe}_ema"
+
+                if (
+                    ema == "🟢 کراس صعودی"
+                    and
+                    not alert_cache.get(ema_key)
+                ):
+
+                    print(
+                        f"EMA ALERT {coin} {timeframe}"
+                    )
+
+                    alert_cache[ema_key] = True
+
+                elif ema == "🔴 کراس نزولی":
+
+                    alert_cache[ema_key] = False
+
+                # =====================
+                # RSI ALERT
+                # =====================
+
+                rsi_key = f"{coin}_{timeframe}_rsi"
+
+                if rsi >= 70:
+
+                    if not alert_cache.get(rsi_key):
+
+                        print(
+                            f"RSI OVERBOUGHT {coin} {timeframe}"
+                        )
+
+                        alert_cache[rsi_key] = True
+
+                elif rsi <= 30:
+
+                    if not alert_cache.get(rsi_key):
+
+                        print(
+                            f"RSI OVERSOLD {coin} {timeframe}"
+                        )
+
+                        alert_cache[rsi_key] = True
+
+                else:
+
+                    alert_cache[rsi_key] = False
+
+                # =====================
+                # DIVERGENCE
+                # =====================
+
+                if timeframe in ["4H", "1D"]:
+
+                    div = detect_divergence(
+                        coin,
+                        timeframe
+                    )
+
+                    div_key = f"{coin}_{timeframe}_div"
+
+                    if (
+                        div
+                        and
+                        not alert_cache.get(div_key)
+                    ):
+
+                        print(
+                            f"DIVERGENCE {coin} {timeframe}"
+                        )
+
+                        alert_cache[div_key] = True
+
+                    elif not div:
+
+                        alert_cache[div_key] = False
+
+            except Exception as e:
+
+                print("SCANNER ERROR:", e)
 
 # =========================================
 # MESSAGE HANDLER
@@ -334,6 +543,7 @@ async def health(update):
 async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
+
     user_id = update.effective_user.id
 
     # =====================================
@@ -398,6 +608,21 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     # =====================================
+    # DIVERGENCE
+    # =====================================
+
+    elif text == "📉 واگرایی RSI":
+
+        user_state[user_id] = {
+            "action": "div"
+        }
+
+        await update.message.reply_text(
+            "💎 ارز را انتخاب کن:",
+            reply_markup=coin_keyboard()
+        )
+
+    # =====================================
     # PRESSURE
     # =====================================
 
@@ -446,7 +671,7 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     # =====================================
-    # TIMEFRAME SELECT
+    # TIMEFRAME
     # =====================================
 
     elif text.startswith("⏰"):
@@ -457,9 +682,9 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         coin = user_state[user_id]["coin"]
 
-        # =================================
+        # ================================
         # PRICE
-        # =================================
+        # ================================
 
         if action == "price":
 
@@ -469,18 +694,15 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""
 💰 قیمت لحظه‌ای
 
-━━━━━━━━━━━━━━
+💎 {coin}
 
-💎 ارز: {coin}
-
-💵 قیمت:
-{price} $
+💵 {price} $
 """
             )
 
-        # =================================
+        # ================================
         # RSI
-        # =================================
+        # ================================
 
         elif action == "rsi":
 
@@ -489,36 +711,21 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 timeframe
             )
 
-            status = "⚪ نرمال"
-
-            if rsi >= 70:
-
-                status = "🔴 اشباع خرید"
-
-            elif rsi <= 30:
-
-                status = "🟢 اشباع فروش"
-
             await update.message.reply_text(
                 f"""
-📈 تحلیل RSI
+📈 RSI
 
-━━━━━━━━━━━━━━
+💎 {coin}
+⏰ {timeframe}
 
-💎 ارز: {coin}
-
-⏰ تایم‌فریم: {timeframe}
-
-📊 مقدار RSI:
+📊 مقدار:
 {rsi}
-
-{status}
 """
             )
 
-        # =================================
+        # ================================
         # EMA
-        # =================================
+        # ================================
 
         elif action == "ema":
 
@@ -529,25 +736,56 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await update.message.reply_text(
                 f"""
-⚡ تحلیل EMA
+⚡ EMA CROSS
 
-━━━━━━━━━━━━━━
-
-💎 ارز: {coin}
-
-⏰ تایم‌فریم: {timeframe}
+💎 {coin}
+⏰ {timeframe}
 
 {result}
 """
             )
 
-        # =================================
+        # ================================
+        # DIVERGENCE
+        # ================================
+
+        elif action == "div":
+
+            if timeframe not in ["4H", "1D"]:
+
+                await update.message.reply_text(
+                    "❌ واگرایی فقط روی 4H و 1D فعال است"
+                )
+
+                return
+
+            div = detect_divergence(
+                coin,
+                timeframe
+            )
+
+            if div is None:
+
+                div = "⚪ واگرایی خاصی یافت نشد"
+
+            await update.message.reply_text(
+                f"""
+📉 واگرایی RSI
+
+💎 {coin}
+⏰ {timeframe}
+
+{div}
+"""
+            )
+
+        # ================================
         # PRESSURE
-        # =================================
+        # ================================
 
         elif action == "pressure":
 
-            result = market_pressure(
+            pressure = market_pressure(
                 coin,
                 timeframe
             )
@@ -556,19 +794,16 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""
 📦 فشار بازار
 
-━━━━━━━━━━━━━━
+💎 {coin}
+⏰ {timeframe}
 
-💎 ارز: {coin}
-
-⏰ تایم‌فریم: {timeframe}
-
-{result}
+{pressure}
 """
             )
 
-        # =================================
+        # ================================
         # ANALYSIS
-        # =================================
+        # ================================
 
         elif action == "analysis":
 
@@ -591,11 +826,8 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""
 📊 تحلیل کامل بازار
 
-━━━━━━━━━━━━━━
-
-💎 ارز: {coin}
-
-⏰ تایم‌فریم: {timeframe}
+💎 {coin}
+⏰ {timeframe}
 
 📈 RSI:
 {rsi}
@@ -634,6 +866,16 @@ def main():
             filters.TEXT,
             messages
         )
+    )
+
+    # =====================================
+    # AUTO SCANNER
+    # =====================================
+
+    app.job_queue.run_repeating(
+        market_scanner,
+        interval=60,
+        first=10
     )
 
     print("BOT RUNNING 🚀")
