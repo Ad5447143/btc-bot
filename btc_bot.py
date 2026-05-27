@@ -1,149 +1,138 @@
-
-from telegram import ( 
-    Update,
-    ReplyKeyboardMarkup,
-    KeyboardButton
+from telegram import (
+Update,
+ReplyKeyboardMarkup,
+KeyboardButton
 )
 
 from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
+Application,
+CommandHandler,
+MessageHandler,
+ContextTypes,
+filters
 )
 
 from config import (
-    BOT_TOKEN,
-    SCANNER_INTERVAL,
-    COINS
+BOT_TOKEN,
+SCANNER_INTERVAL,
+COINS
 )
 
 from services.market import (
-    get_price,
-    api_health
+get_price,
+api_health
 )
 
 from services.analysis import (
-    calculate_rsi,
-    ema_cross,
-    market_pressure,
-    detect_divergence,
-    multi_timeframe_analysis
+calculate_rsi,
+ema_cross,
+market_pressure,
+detect_divergence,
+multi_timeframe_analysis
 )
 
 from services.scanner import (
-    market_scanner
+market_scanner
 )
 
 from services.targets import (
-    add_target,
-    check_targets,
-    add_rsi_target,
-    check_rsi_targets
+add_target,
+check_targets,
+add_rsi_target,
+check_rsi_targets
 )
 
 from services.security import (
-    register_user,
-    users_text,
-    anti_flood
+register_user,
+users_text,
+anti_flood
 )
-
-# =========================================
-# USER STATE
-# =========================================
 
 user_state = {}
 
-# =========================================
-# MAIN MENU
-# =========================================
-
 main_menu = ReplyKeyboardMarkup(
-    [
-        ["🚀 شروع ربات"],
+[
+["🚀 شروع ربات"],
 
-        ["💰 قیمت لحظه‌ای",
-         "📊 تحلیل بازار"],
+```
+    ["💰 قیمت لحظه‌ای",
+     "📊 تحلیل بازار"],
 
-        ["📈 RSI",
-         "⚡ EMA کراس"],
+    ["📈 RSI",
+     "⚡ EMA کراس"],
 
-        ["📉 واگرایی RSI",
-         "📦 فشار بازار"],
+    ["📉 واگرایی RSI",
+     "📦 فشار بازار"],
 
-        ["🧠 تحلیل مولتی تایم"],
+    ["🧠 تحلیل مولتی تایم"],
 
-        ["🎯 تارگت گذاری",
-         "🎯 RSI تارگت"],
+    ["🎯 تارگت گذاری",
+     "🎯 RSI تارگت"],
 
-        ["🛡 امنیت"],
+    ["🛡 امنیت"],
 
-        ["🩺 سلامت ربات"]
-    ],
-    resize_keyboard=True
+    ["🩺 سلامت ربات"]
+],
+resize_keyboard=True
+```
+
 )
-
-# =========================================
-# COIN KEYBOARD
-# =========================================
 
 def coin_keyboard():
 
-    rows = []
+```
+rows = []
 
-    row = []
+row = []
 
-    for i, coin in enumerate(
-        COINS.keys(),
-        start=1
-    ):
+for i, coin in enumerate(
+    COINS.keys(),
+    start=1
+):
 
-        row.append(
-            KeyboardButton(
-                f"💎 {coin}"
-            )
+    row.append(
+        KeyboardButton(
+            f"💎 {coin}"
         )
+    )
 
-        if i % 3 == 0:
-
-            rows.append(row)
-
-            row = []
-
-    if row:
+    if i % 3 == 0:
 
         rows.append(row)
 
-    return ReplyKeyboardMarkup(
-        rows,
-        resize_keyboard=True
-    )
+        row = []
 
-# =========================================
-# TIMEFRAME KEYBOARD
-# =========================================
+if row:
+
+    rows.append(row)
+
+return ReplyKeyboardMarkup(
+    rows,
+    resize_keyboard=True
+)
+```
 
 def timeframe_keyboard():
 
-    return ReplyKeyboardMarkup(
-        [
-            ["⏰ 5m", "⏰ 15m"],
-            ["⏰ 4H", "⏰ 1D"]
-        ],
-        resize_keyboard=True
-    )
-
-# =========================================
-# START
-# =========================================
+```
+return ReplyKeyboardMarkup(
+    [
+        ["⏰ 5m", "⏰ 15m"],
+        ["⏰ 4H", "⏰ 1D"]
+    ],
+    resize_keyboard=True
+)
+```
 
 async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+update: Update,
+context: ContextTypes.DEFAULT_TYPE
 ):
 
-    text = """
+```
+text = """
+```
+
 🚀 Crypto AI Bot PRO
 
 ━━━━━━━━━━━━━━
@@ -162,27 +151,28 @@ async def start(
 🟢 ربات فعال است
 """
 
-    await update.message.reply_text(
-        text,
-        reply_markup=main_menu
-    )
-
-# =========================================
-# HEALTH
-# =========================================
+```
+await update.message.reply_text(
+    text,
+    reply_markup=main_menu
+)
+```
 
 async def health(update):
 
-    api = api_health()
+```
+api = api_health()
 
-    api_status = (
-        "🟢 سالم"
-        if api
-        else
-        "🔴 مشکل"
-    )
+api_status = (
+    "🟢 سالم"
+    if api
+    else
+    "🔴 مشکل"
+)
 
-    text = f"""
+text = f"""
+```
+
 🩺 سلامت ربات
 
 ━━━━━━━━━━━━━━
@@ -212,336 +202,260 @@ Security:
 🟢 فعال
 """
 
-    await update.message.reply_text(
-        text
-    )
-
-# =========================================
-# MESSAGE HANDLER
-# =========================================
+```
+await update.message.reply_text(
+    text
+)
+```
 
 async def messages(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+update: Update,
+context: ContextTypes.DEFAULT_TYPE
 ):
 
-    text = update.message.text
+```
+text = update.message.text
 
-    user_id = update.effective_user.id
+user_id = update.effective_user.id
 
-    # =====================================
-    # REGISTER + SECURITY
-    # =====================================
+await register_user(
+    update,
+    context
+)
 
-    await register_user(
+anti_flood(user_id)
+
+if text == "🚀 شروع ربات":
+
+    await start(
         update,
         context
     )
 
-    anti_flood(user_id)
+elif text == "🛡 امنیت":
 
-    # =====================================
-    # START
-    # =====================================
-
-    if text == "🚀 شروع ربات":
-
-        await start(
-            update,
-            context
-        )
-
-    # =====================================
-    # SECURITY PANEL
-    # =====================================
-
-    elif text == "🛡 امنیت":
-
-        if user_id != 369031827:
-
-            await update.message.reply_text(
-                "❌ دسترسی غیر مجاز"
-            )
-
-            return
-
-        users = users_text()
+    if user_id != 369031827:
 
         await update.message.reply_text(
-            users
+            "❌ دسترسی غیر مجاز"
         )
 
-    # =====================================
-    # HEALTH
-    # =====================================
+        return
 
-    elif text == "🩺 سلامت ربات":
+    users = users_text()
 
-        await health(update)
+    await update.message.reply_text(
+        users
+    )
 
-    # =====================================
-    # PRICE
-    # =====================================
+elif text == "🩺 سلامت ربات":
 
-    elif text == "💰 قیمت لحظه‌ای":
+    await health(update)
 
-        user_state[user_id] = {
-            "action": "price"
-        }
+elif text == "💰 قیمت لحظه‌ای":
+
+    user_state[user_id] = {
+        "action": "price"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text == "📈 RSI":
+
+    user_state[user_id] = {
+        "action": "rsi"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text == "⚡ EMA کراس":
+
+    user_state[user_id] = {
+        "action": "ema"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text == "📦 فشار بازار":
+
+    user_state[user_id] = {
+        "action": "pressure"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text == "📉 واگرایی RSI":
+
+    user_state[user_id] = {
+        "action": "div"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text == "🧠 تحلیل مولتی تایم":
+
+    user_state[user_id] = {
+        "action": "multi"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text == "📊 تحلیل بازار":
+
+    user_state[user_id] = {
+        "action": "analysis"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text == "🎯 تارگت گذاری":
+
+    user_state[user_id] = {
+        "action": "target"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text == "🎯 RSI تارگت":
+
+    user_state[user_id] = {
+        "action": "rsi_target"
+    }
+
+    await update.message.reply_text(
+        "💎 ارز را انتخاب کن:",
+        reply_markup=coin_keyboard()
+    )
+
+elif text.startswith("💎"):
+
+    coin = text.replace(
+        "💎 ",
+        ""
+    )
+
+    if coin not in COINS:
+
+        return
+
+    if user_id not in user_state:
+
+        return
+
+    user_state[user_id]["coin"] = coin
+
+    action = user_state[user_id]["action"]
+
+    if action == "multi":
+
+        result = multi_timeframe_analysis(
+            coin
+        )
 
         await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
+            result
         )
 
-    # =====================================
-    # RSI
-    # =====================================
+        return
 
-    elif text == "📈 RSI":
+    await update.message.reply_text(
+        "⏰ تایم فریم را انتخاب کن:",
+        reply_markup=timeframe_keyboard()
+    )
 
-        user_state[user_id] = {
-            "action": "rsi"
-        }
+elif text.startswith("⏰"):
+
+    timeframe = text.replace(
+        "⏰ ",
+        ""
+    )
+
+    if user_id not in user_state:
+
+        return
+
+    if "coin" not in user_state[user_id]:
+
+        return
+
+    action = user_state[user_id]["action"]
+
+    coin = user_state[user_id]["coin"]
+
+    if action == "target":
+
+        user_state[user_id]["timeframe"] = timeframe
+
+        user_state[user_id]["step"] = "target1"
 
         await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
+            "🎯 Target 1 را وارد کن:"
         )
 
-    # =====================================
-    # EMA
-    # =====================================
+        return
 
-    elif text == "⚡ EMA کراس":
+    if action == "rsi_target":
 
-        user_state[user_id] = {
-            "action": "ema"
-        }
+        user_state[user_id]["timeframe"] = timeframe
 
         await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
+            "🎯 مقدار RSI را وارد کن:"
         )
 
-    # =====================================
-    # PRESSURE
-    # =====================================
+        return
 
-    elif text == "📦 فشار بازار":
+    if action == "price":
 
-        user_state[user_id] = {
-            "action": "pressure"
-        }
+        price = get_price(coin)
 
         await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
-        )
+            f"""
+```
 
-    # =====================================
-    # DIVERGENCE
-    # =====================================
-
-    elif text == "📉 واگرایی RSI":
-
-        user_state[user_id] = {
-            "action": "div"
-        }
-
-        await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
-        )
-
-    # =====================================
-    # MULTI TIMEFRAME
-    # =====================================
-
-    elif text == "🧠 تحلیل مولتی تایم":
-
-        user_state[user_id] = {
-            "action": "multi"
-        }
-
-        await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
-        )
-
-    # =====================================
-    # ANALYSIS
-    # =====================================
-
-    elif text == "📊 تحلیل بازار":
-
-        user_state[user_id] = {
-            "action": "analysis"
-        }
-
-        await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
-        )
-
-    # =====================================
-    # TARGET
-    # =====================================
-
-    elif text == "🎯 تارگت گذاری":
-
-        user_state[user_id] = {
-            "action": "target"
-        }
-
-        await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
-        )
-
-    # =====================================
-    # RSI TARGET
-    # =====================================
-
-    elif text == "🎯 RSI تارگت":
-
-        user_state[user_id] = {
-            "action": "rsi_target"
-        }
-
-        await update.message.reply_text(
-            "💎 ارز را انتخاب کن:",
-            reply_markup=coin_keyboard()
-        )
-
-    # =====================================
-    # COIN SELECT
-    # =====================================
-
-    elif text.startswith("💎"):
-
-        coin = text.replace(
-            "💎 ",
-            ""
-        )
-
-        if coin not in COINS:
-
-            return
-
-        if user_id not in user_state:
-
-            return
-
-        user_state[user_id]["coin"] = coin
-
-        action = user_state[user_id]["action"]
-
-        # =================================
-        # MULTI TF
-        # =================================
-
-        if action == "multi":
-
-            result = multi_timeframe_analysis(
-                coin
-            )
-
-            await update.message.reply_text(
-                result
-            )
-
-            return
-
-        await update.message.reply_text(
-            "⏰ تایم فریم را انتخاب کن:",
-            reply_markup=timeframe_keyboard()
-        )
-
-    # =====================================
-    # TIMEFRAME
-    # =====================================
-
-    elif text.startswith("⏰"):
-
-        timeframe = text.replace(
-            "⏰ ",
-            ""
-        )
-
-        if user_id not in user_state:
-
-            return
-
-        if "coin" not in user_state[user_id]:
-
-            return
-
-        action = user_state[user_id]["action"]
-
-        coin = user_state[user_id]["coin"]
-
-        # =================================
-        # TARGET
-        # =================================
-
-        if action == "target":
-
-            user_state[user_id]["timeframe"] = timeframe
-
-            user_state[user_id]["step"] = "target1"
-
-            await update.message.reply_text(
-                "🎯 Target 1 را وارد کن:"
-            )
-
-            return
-
-        # =================================
-        # RSI TARGET
-        # =================================
-
-        if action == "rsi_target":
-
-            user_state[user_id]["timeframe"] = timeframe
-
-            await update.message.reply_text(
-                "🎯 مقدار RSI را وارد کن:"
-            )
-
-            return
-
-        # =================================
-        # PRICE
-        # =================================
-
-        if action == "price":
-
-            price = get_price(coin)
-
-            await update.message.reply_text(
-                f"""
 💰 قیمت لحظه‌ای
 
 💎 {coin}
 
 💵 {price} $
 """
-            )
+)
 
-        # =================================
-        # RSI
-        # =================================
+```
+    elif action == "rsi":
 
-        elif action == "rsi":
+        rsi = calculate_rsi(
+            coin,
+            timeframe
+        )
 
-            rsi = calculate_rsi(
-                coin,
-                timeframe
-            )
+        await update.message.reply_text(
+            f"""
+```
 
-            await update.message.reply_text(
-                f"""
 📈 RSI
 
 💎 {coin}
@@ -550,21 +464,20 @@ async def messages(
 📊 RSI:
 {rsi}
 """
-            )
+)
 
-        # =================================
-        # EMA
-        # =================================
+```
+    elif action == "ema":
 
-        elif action == "ema":
+        ema = ema_cross(
+            coin,
+            timeframe
+        )
 
-            ema = ema_cross(
-                coin,
-                timeframe
-            )
+        await update.message.reply_text(
+            f"""
+```
 
-            await update.message.reply_text(
-                f"""
 ⚡ EMA کراس
 
 💎 {coin}
@@ -572,21 +485,20 @@ async def messages(
 
 {ema}
 """
-            )
+)
 
-        # =================================
-        # PRESSURE
-        # =================================
+```
+    elif action == "pressure":
 
-        elif action == "pressure":
+        pressure = market_pressure(
+            coin,
+            timeframe
+        )
 
-            pressure = market_pressure(
-                coin,
-                timeframe
-            )
+        await update.message.reply_text(
+            f"""
+```
 
-            await update.message.reply_text(
-                f"""
 📦 فشار بازار
 
 💎 {coin}
@@ -594,21 +506,20 @@ async def messages(
 
 {pressure}
 """
-            )
+)
 
-        # =================================
-        # DIVERGENCE
-        # =================================
+```
+    elif action == "div":
 
-        elif action == "div":
+        div = detect_divergence(
+            coin,
+            timeframe
+        )
 
-            div = detect_divergence(
-                coin,
-                timeframe
-            )
+        await update.message.reply_text(
+            f"""
+```
 
-            await update.message.reply_text(
-                f"""
 📉 واگرایی RSI
 
 💎 {coin}
@@ -616,85 +527,39 @@ async def messages(
 
 {div}
 """
-            )
+)
 
-        # =================================
-        # ANALYSIS
-        # =================================
+```
+elif user_id in user_state:
 
-        elif action == "analysis":
+    if user_state[user_id].get(
+        "action"
+    ) == "rsi_target":
 
-            rsi = calculate_rsi(
-                coin,
-                timeframe
-            )
+        state = user_state[user_id]
 
-            ema = ema_cross(
-                coin,
-                timeframe
-            )
+        try:
 
-            pressure = market_pressure(
-                coin,
-                timeframe
-            )
+            value = float(text)
+
+        except:
 
             await update.message.reply_text(
-                f"""
-📊 تحلیل بازار
-
-💎 {coin}
-⏰ {timeframe}
-
-━━━━━━━━━━━━━━
-
-📈 RSI:
-{rsi}
-
-⚡ EMA:
-{ema}
-
-📦 فشار بازار:
-{pressure}
-"""
+                "❌ عدد معتبر وارد کن"
             )
 
-    # =====================================
-    # INPUT HANDLER
-    # =====================================
+            return
 
-    elif user_id in user_state:
+        add_rsi_target(
+            state["coin"],
+            state["timeframe"],
+            value
+        )
 
-        # =================================
-        # RSI TARGET
-        # =================================
+        await update.message.reply_text(
+            f"""
+```
 
-        if user_state[user_id].get(
-            "action"
-        ) == "rsi_target":
-
-            state = user_state[user_id]
-
-            try:
-
-                value = float(text)
-
-            except:
-
-                await update.message.reply_text(
-                    "❌ عدد معتبر وارد کن"
-                )
-
-                return
-
-            add_rsi_target(
-                state["coin"],
-                state["timeframe"],
-                value
-            )
-
-            await update.message.reply_text(
-                f"""
 ✅ RSI Target ذخیره شد
 
 💎 {state['coin']}
@@ -703,156 +568,63 @@ async def messages(
 🎯 RSI:
 {value}
 """,
-                reply_markup=main_menu
-            )
+reply_markup=main_menu
+)
 
-            del user_state[user_id]
+```
+        del user_state[user_id]
 
-            return
-
-        # =================================
-        # NORMAL TARGETS
-        # =================================
-
-        if user_state[user_id].get(
-            "action"
-        ) == "target":
-
-            state = user_state[user_id]
-
-            try:
-
-                value = float(text)
-
-            except:
-
-                await update.message.reply_text(
-                    "❌ عدد معتبر وارد کن"
-                )
-
-                return
-
-            if state["step"] == "target1":
-
-                state["target1"] = value
-
-                state["step"] = "target2"
-
-                await update.message.reply_text(
-                    "🎯 Target 2 را وارد کن:"
-                )
-
-                return
-
-            elif state["step"] == "target2":
-
-                state["target2"] = value
-
-                state["step"] = "target3"
-
-                await update.message.reply_text(
-                    "🎯 Target 3 را وارد کن:"
-                )
-
-                return
-
-            elif state["step"] == "target3":
-
-                state["target3"] = value
-
-                add_target(
-                    state["coin"],
-                    state["timeframe"],
-                    state["target1"],
-                    state["target2"],
-                    value
-                )
-
-                await update.message.reply_text(
-                    f"""
-✅ تارگت ذخیره شد
-
-💎 {state['coin']}
-⏰ {state['timeframe']}
-
-🎯 T1 → {state['target1']}
-🎯 T2 → {state['target2']}
-🎯 T3 → {value}
-""",
-                    reply_markup=main_menu
-                )
-
-                del user_state[user_id]
-
-# =========================================
-# MAIN
-# =========================================
+        return
+```
 
 def main():
 
-    print("BOT STARTED 🚀")
+```
+print("BOT STARTED 🚀")
 
-    app = Application.builder().token(
-        BOT_TOKEN
-    ).build()
+app = Application.builder().token(
+    BOT_TOKEN
+).build()
 
-    # =====================================
-    # HANDLERS
-    # =====================================
-
-    app.add_handler(
-        CommandHandler(
-            "start",
-            start
-        )
+app.add_handler(
+    CommandHandler(
+        "start",
+        start
     )
+)
 
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT,
-            messages
-        )
+app.add_handler(
+    MessageHandler(
+        filters.TEXT,
+        messages
     )
+)
 
-    # =====================================
-    # MARKET SCANNER
-    # =====================================
+app.job_queue.run_repeating(
+    market_scanner,
+    interval=SCANNER_INTERVAL,
+    first=15
+)
 
-    app.job_queue.run_repeating(
-        market_scanner,
-        interval=SCANNER_INTERVAL,
-        first=15
-    )
+app.job_queue.run_repeating(
+    check_targets,
+    interval=60,
+    first=20
+)
 
-    # =====================================
-    # TARGET SCANNER
-    # =====================================
+app.job_queue.run_repeating(
+    check_rsi_targets,
+    interval=60,
+    first=25
+)
 
-    app.job_queue.run_repeating(
-        check_targets,
-        interval=60,
-        first=20
-    )
+print("BOT RUNNING 🚀")
 
-    # =====================================
-    # RSI TARGET SCANNER
-    # =====================================
+app.run_polling()
+```
 
-    app.job_queue.run_repeating(
-        check_rsi_targets,
-        interval=60,
-        first=25
-    )
+if **name** == "**main**":
 
-    print("BOT RUNNING 🚀")
-
-    app.run_polling()
-
-# =========================================
-# RUN
-# =========================================
-
-if __name__ == "__main__":
-
-    main()
+```
+main()
 ```
