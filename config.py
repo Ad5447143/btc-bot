@@ -3,7 +3,7 @@
 # BOT TOKEN
 # =========================================
 
-BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
+BOT_TOKEN = "8995261480:AAG1wJYInkniYaJTBkiFPienfzFP5c_I7cE"
 
 # =========================================
 # COINS
