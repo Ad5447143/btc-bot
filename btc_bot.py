@@ -1,8 +1,4 @@
-from telegram import (
-Update,
-ReplyKeyboardMarkup,
-KeyboardButton
-)
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 
 from telegram.ext import (
 Application,
@@ -55,19 +51,15 @@ main_menu = ReplyKeyboardMarkup(
 ["🚀 شروع ربات"],
 
 ```
-    ["💰 قیمت لحظه‌ای",
-     "📊 تحلیل بازار"],
+    ["💰 قیمت لحظه‌ای", "📊 تحلیل بازار"],
 
-    ["📈 RSI",
-     "⚡ EMA کراس"],
+    ["📈 RSI", "⚡ EMA کراس"],
 
-    ["📉 واگرایی RSI",
-     "📦 فشار بازار"],
+    ["📉 واگرایی RSI", "📦 فشار بازار"],
 
     ["🧠 تحلیل مولتی تایم"],
 
-    ["🎯 تارگت گذاری",
-     "🎯 RSI تارگت"],
+    ["🎯 تارگت گذاری", "🎯 RSI تارگت"],
 
     ["🛡 امنیت"],
 
@@ -318,17 +310,6 @@ elif text == "🧠 تحلیل مولتی تایم":
         reply_markup=coin_keyboard()
     )
 
-elif text == "📊 تحلیل بازار":
-
-    user_state[user_id] = {
-        "action": "analysis"
-    }
-
-    await update.message.reply_text(
-        "💎 ارز را انتخاب کن:",
-        reply_markup=coin_keyboard()
-    )
-
 elif text == "🎯 تارگت گذاری":
 
     user_state[user_id] = {
@@ -433,18 +414,9 @@ elif text.startswith("⏰"):
         price = get_price(coin)
 
         await update.message.reply_text(
-            f"""
-```
+            f"💰 {coin}\n\n💵 {price}$"
+        )
 
-💰 قیمت لحظه‌ای
-
-💎 {coin}
-
-💵 {price} $
-"""
-)
-
-```
     elif action == "rsi":
 
         rsi = calculate_rsi(
@@ -453,20 +425,9 @@ elif text.startswith("⏰"):
         )
 
         await update.message.reply_text(
-            f"""
-```
+            f"📈 RSI {coin}\n⏰ {timeframe}\n\n📊 {rsi}"
+        )
 
-📈 RSI
-
-💎 {coin}
-⏰ {timeframe}
-
-📊 RSI:
-{rsi}
-"""
-)
-
-```
     elif action == "ema":
 
         ema = ema_cross(
@@ -475,19 +436,9 @@ elif text.startswith("⏰"):
         )
 
         await update.message.reply_text(
-            f"""
-```
+            f"⚡ EMA\n\n{ema}"
+        )
 
-⚡ EMA کراس
-
-💎 {coin}
-⏰ {timeframe}
-
-{ema}
-"""
-)
-
-```
     elif action == "pressure":
 
         pressure = market_pressure(
@@ -496,19 +447,9 @@ elif text.startswith("⏰"):
         )
 
         await update.message.reply_text(
-            f"""
-```
+            f"📦 فشار بازار\n\n{pressure}"
+        )
 
-📦 فشار بازار
-
-💎 {coin}
-⏰ {timeframe}
-
-{pressure}
-"""
-)
-
-```
     elif action == "div":
 
         div = detect_divergence(
@@ -517,19 +458,9 @@ elif text.startswith("⏰"):
         )
 
         await update.message.reply_text(
-            f"""
-```
+            f"📉 واگرایی RSI\n\n{div}"
+        )
 
-📉 واگرایی RSI
-
-💎 {coin}
-⏰ {timeframe}
-
-{div}
-"""
-)
-
-```
 elif user_id in user_state:
 
     if user_state[user_id].get(
