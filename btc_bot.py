@@ -1,4 +1,4 @@
-```python id="4g4e2l"
+```python id="r5i4o0"
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
@@ -230,7 +230,7 @@ async def messages(
     user_id = update.effective_user.id
 
     # =====================================
-    # SECURITY
+    # REGISTER + SECURITY
     # =====================================
 
     await register_user(
@@ -355,7 +355,7 @@ async def messages(
         )
 
     # =====================================
-    # MULTI TF
+    # MULTI TIMEFRAME
     # =====================================
 
     elif text == "🧠 تحلیل مولتی تایم":
@@ -429,12 +429,16 @@ async def messages(
 
             return
 
+        if user_id not in user_state:
+
+            return
+
         user_state[user_id]["coin"] = coin
 
         action = user_state[user_id]["action"]
 
         # =================================
-        # MULTI TIMEFRAME
+        # MULTI TF
         # =================================
 
         if action == "multi":
@@ -464,6 +468,14 @@ async def messages(
             "⏰ ",
             ""
         )
+
+        if user_id not in user_state:
+
+            return
+
+        if "coin" not in user_state[user_id]:
+
+            return
 
         action = user_state[user_id]["action"]
 
@@ -648,7 +660,7 @@ async def messages(
             )
 
     # =====================================
-    # TARGET INPUTS
+    # INPUT HANDLER
     # =====================================
 
     elif user_id in user_state:
@@ -720,10 +732,6 @@ async def messages(
 
                 return
 
-            # =============================
-            # TARGET 1
-            # =============================
-
             if state["step"] == "target1":
 
                 state["target1"] = value
@@ -736,10 +744,6 @@ async def messages(
 
                 return
 
-            # =============================
-            # TARGET 2
-            # =============================
-
             elif state["step"] == "target2":
 
                 state["target2"] = value
@@ -751,10 +755,6 @@ async def messages(
                 )
 
                 return
-
-            # =============================
-            # TARGET 3
-            # =============================
 
             elif state["step"] == "target3":
 
