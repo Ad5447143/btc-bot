@@ -1,4 +1,4 @@
-```python
+```python id="4g4e2l"
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
@@ -38,7 +38,15 @@ from services.scanner import (
 
 from services.targets import (
     add_target,
-    check_targets
+    check_targets,
+    add_rsi_target,
+    check_rsi_targets
+)
+
+from services.security import (
+    register_user,
+    users_text,
+    anti_flood
 )
 
 # =========================================
@@ -54,11 +62,23 @@ user_state = {}
 main_menu = ReplyKeyboardMarkup(
     [
         ["🚀 شروع ربات"],
-        ["💰 قیمت لحظه‌ای", "📊 تحلیل بازار"],
-        ["📈 RSI", "⚡ EMA کراس"],
-        ["📉 واگرایی RSI", "📦 فشار بازار"],
+
+        ["💰 قیمت لحظه‌ای",
+         "📊 تحلیل بازار"],
+
+        ["📈 RSI",
+         "⚡ EMA کراس"],
+
+        ["📉 واگرایی RSI",
+         "📦 فشار بازار"],
+
         ["🧠 تحلیل مولتی تایم"],
-        ["🎯 تارگت گذاری"],
+
+        ["🎯 تارگت گذاری",
+         "🎯 RSI تارگت"],
+
+        ["🛡 امنیت"],
+
         ["🩺 سلامت ربات"]
     ],
     resize_keyboard=True
@@ -128,13 +148,14 @@ async def start(
 
 ━━━━━━━━━━━━━━
 
-✅ EMA Scanner
 ✅ RSI Scanner
+✅ EMA Scanner
 ✅ Divergence Scanner
-✅ Auto Alerts
 ✅ Multi Timeframe
-✅ Real Market Analysis
-✅ Real Target System
+✅ Real Targets
+✅ RSI Targets
+✅ Auto Alerts
+✅ Security System
 
 ━━━━━━━━━━━━━━
 
@@ -181,14 +202,19 @@ EMA Engine:
 Scanner:
 🟢 فعال
 
-Alerts:
+Targets:
 🟢 فعال
 
-Targets:
+RSI Targets:
+🟢 فعال
+
+Security:
 🟢 فعال
 """
 
-    await update.message.reply_text(text)
+    await update.message.reply_text(
+        text
+    )
 
 # =========================================
 # MESSAGE HANDLER
@@ -204,12 +230,46 @@ async def messages(
     user_id = update.effective_user.id
 
     # =====================================
+    # SECURITY
+    # =====================================
+
+    await register_user(
+        update,
+        context
+    )
+
+    anti_flood(user_id)
+
+    # =====================================
     # START
     # =====================================
 
     if text == "🚀 شروع ربات":
 
-        await start(update, context)
+        await start(
+            update,
+            context
+        )
+
+    # =====================================
+    # SECURITY PANEL
+    # =====================================
+
+    elif text == "🛡 امنیت":
+
+        if user_id != 369031827:
+
+            await update.message.reply_text(
+                "❌ دسترسی غیر مجاز"
+            )
+
+            return
+
+        users = users_text()
+
+        await update.message.reply_text(
+            users
+        )
 
     # =====================================
     # HEALTH
@@ -340,6 +400,21 @@ async def messages(
         )
 
     # =====================================
+    # RSI TARGET
+    # =====================================
+
+    elif text == "🎯 RSI تارگت":
+
+        user_state[user_id] = {
+            "action": "rsi_target"
+        }
+
+        await update.message.reply_text(
+            "💎 ارز را انتخاب کن:",
+            reply_markup=coin_keyboard()
+        )
+
+    # =====================================
     # COIN SELECT
     # =====================================
 
@@ -351,6 +426,7 @@ async def messages(
         )
 
         if coin not in COINS:
+
             return
 
         user_state[user_id]["coin"] = coin
@@ -358,7 +434,7 @@ async def messages(
         action = user_state[user_id]["action"]
 
         # =================================
-        # MULTI TF
+        # MULTI TIMEFRAME
         # =================================
 
         if action == "multi":
@@ -374,7 +450,7 @@ async def messages(
             return
 
         await update.message.reply_text(
-            "⏰ تایم‌فریم را انتخاب کن:",
+            "⏰ تایم فریم را انتخاب کن:",
             reply_markup=timeframe_keyboard()
         )
 
@@ -405,6 +481,20 @@ async def messages(
 
             await update.message.reply_text(
                 "🎯 Target 1 را وارد کن:"
+            )
+
+            return
+
+        # =================================
+        # RSI TARGET
+        # =================================
+
+        if action == "rsi_target":
+
+            user_state[user_id]["timeframe"] = timeframe
+
+            await update.message.reply_text(
+                "🎯 مقدار RSI را وارد کن:"
             )
 
             return
@@ -463,7 +553,7 @@ async def messages(
 
             await update.message.reply_text(
                 f"""
-⚡ EMA
+⚡ EMA کراس
 
 💎 {coin}
 ⏰ {timeframe}
@@ -500,25 +590,10 @@ async def messages(
 
         elif action == "div":
 
-            if timeframe not in [
-                "4H",
-                "1D"
-            ]:
-
-                await update.message.reply_text(
-                    "❌ فقط 4H و 1D"
-                )
-
-                return
-
             div = detect_divergence(
                 coin,
                 timeframe
             )
-
-            if div is None:
-
-                div = "⚪ واگرایی یافت نشد"
 
             await update.message.reply_text(
                 f"""
@@ -573,12 +648,18 @@ async def messages(
             )
 
     # =====================================
-    # TARGET INPUT
+    # TARGET INPUTS
     # =====================================
 
     elif user_id in user_state:
 
-        if user_state[user_id].get("action") == "target":
+        # =================================
+        # RSI TARGET
+        # =================================
+
+        if user_state[user_id].get(
+            "action"
+        ) == "rsi_target":
 
             state = user_state[user_id]
 
@@ -594,9 +675,54 @@ async def messages(
 
                 return
 
-            # =================================
+            add_rsi_target(
+                state["coin"],
+                state["timeframe"],
+                value
+            )
+
+            await update.message.reply_text(
+                f"""
+✅ RSI Target ذخیره شد
+
+💎 {state['coin']}
+⏰ {state['timeframe']}
+
+🎯 RSI:
+{value}
+""",
+                reply_markup=main_menu
+            )
+
+            del user_state[user_id]
+
+            return
+
+        # =================================
+        # NORMAL TARGETS
+        # =================================
+
+        if user_state[user_id].get(
+            "action"
+        ) == "target":
+
+            state = user_state[user_id]
+
+            try:
+
+                value = float(text)
+
+            except:
+
+                await update.message.reply_text(
+                    "❌ عدد معتبر وارد کن"
+                )
+
+                return
+
+            # =============================
             # TARGET 1
-            # =================================
+            # =============================
 
             if state["step"] == "target1":
 
@@ -610,9 +736,9 @@ async def messages(
 
                 return
 
-            # =================================
+            # =============================
             # TARGET 2
-            # =================================
+            # =============================
 
             elif state["step"] == "target2":
 
@@ -626,9 +752,9 @@ async def messages(
 
                 return
 
-            # =================================
+            # =============================
             # TARGET 3
-            # =================================
+            # =============================
 
             elif state["step"] == "target3":
 
@@ -706,6 +832,16 @@ def main():
         check_targets,
         interval=60,
         first=20
+    )
+
+    # =====================================
+    # RSI TARGET SCANNER
+    # =====================================
+
+    app.job_queue.run_repeating(
+        check_rsi_targets,
+        interval=60,
+        first=25
     )
 
     print("BOT RUNNING 🚀")
