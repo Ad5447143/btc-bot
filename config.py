@@ -48,7 +48,7 @@ ALERT_CACHE_FILE = "storage/alert_cache.json"
 # ADMIN
 # =========================================
 
-ADMIN_ID = 123456789
+ADMIN_ID = 369031827
 
 # =========================================
 # SCANNER
