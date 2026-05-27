@@ -1,12 +1,4 @@
 ```python
-import json
-import os
-import requests
-import pandas as pd
-
-from ta.momentum import RSIIndicator
-from ta.trend import EMAIndicator
-
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
@@ -21,74 +13,33 @@ from telegram.ext import (
     filters
 )
 
-# =========================================
-# TOKEN
-# =========================================
+from config import (
+    BOT_TOKEN,
+    SCANNER_INTERVAL,
+    COINS
+)
 
-BOT_TOKEN = "8995261480:AAFi0H9lQyC8i3od5SjeyStlhwtdpWpCmj0"
+from services.market import (
+    get_price,
+    api_health
+)
 
-# =========================================
-# FILES
-# =========================================
+from services.analysis import (
+    calculate_rsi,
+    ema_cross,
+    market_pressure,
+    detect_divergence,
+    multi_timeframe_analysis
+)
 
-FILES = [
-    "targets.json",
-    "rsi_targets.json",
-    "vip_users.json",
-    "alert_cache.json"
-]
+from services.scanner import (
+    market_scanner
+)
 
-for file in FILES:
-
-    if not os.path.exists(file):
-
-        with open(file, "w") as f:
-
-            if file == "vip_users.json":
-                json.dump([], f)
-            else:
-                json.dump({}, f)
-
-# =========================================
-# LOAD/SAVE JSON
-# =========================================
-
-def load_json(file):
-
-    with open(file, "r") as f:
-        return json.load(f)
-
-def save_json(file, data):
-
-    with open(file, "w") as f:
-        json.dump(data, f, indent=4)
-
-# =========================================
-# COINS
-# =========================================
-
-COINS = {
-    "BTC": "bitcoin",
-    "ETH": "ethereum",
-    "BNB": "binancecoin",
-    "SOL": "solana",
-    "XRP": "ripple",
-    "DOGE": "dogecoin",
-    "ADA": "cardano",
-    "TRX": "tron",
-    "ZEC": "zcash"
-}
-
-# =========================================
-# TIMEFRAMES
-# =========================================
-
-TIMEFRAMES = {
-    "5m": "5min",
-    "15m": "15min",
-    "4H": "4hour",
-    "1D": "1day"
-}
+from services.targets import (
+    add_target,
+    check_targets
+)
 
 # =========================================
 # USER STATE
@@ -97,7 +48,7 @@ TIMEFRAMES = {
 user_state = {}
 
 # =========================================
-# MENU
+# MAIN MENU
 # =========================================
 
 main_menu = ReplyKeyboardMarkup(
@@ -106,8 +57,9 @@ main_menu = ReplyKeyboardMarkup(
         ["💰 قیمت لحظه‌ای", "📊 تحلیل بازار"],
         ["📈 RSI", "⚡ EMA کراس"],
         ["📉 واگرایی RSI", "📦 فشار بازار"],
-        ["🎯 تارگت‌ها", "🩺 سلامت ربات"],
-        ["👑 پنل VIP"]
+        ["🧠 تحلیل مولتی تایم"],
+        ["🎯 تارگت گذاری"],
+        ["🩺 سلامت ربات"]
     ],
     resize_keyboard=True
 )
@@ -122,10 +74,15 @@ def coin_keyboard():
 
     row = []
 
-    for i, coin in enumerate(COINS.keys(), start=1):
+    for i, coin in enumerate(
+        COINS.keys(),
+        start=1
+    ):
 
         row.append(
-            KeyboardButton(f"💎 {coin}")
+            KeyboardButton(
+                f"💎 {coin}"
+            )
         )
 
         if i % 3 == 0:
@@ -135,6 +92,7 @@ def coin_keyboard():
             row = []
 
     if row:
+
         rows.append(row)
 
     return ReplyKeyboardMarkup(
@@ -157,182 +115,26 @@ def timeframe_keyboard():
     )
 
 # =========================================
-# GET PRICE
-# =========================================
-
-def get_price(symbol):
-
-    try:
-
-        coin_id = COINS[symbol]
-
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
-
-        data = requests.get(url, timeout=10).json()
-
-        return data[coin_id]["usd"]
-
-    except:
-
-        return None
-
-# =========================================
-# GET KLINES
-# =========================================
-
-def get_klines(symbol, timeframe):
-
-    try:
-
-        tf = TIMEFRAMES[timeframe]
-
-        url = f"https://api.kucoin.com/api/v1/market/candles?type={tf}&symbol={symbol}-USDT"
-
-        data = requests.get(url, timeout=10).json()
-
-        candles = data["data"]
-
-        closes = []
-
-        for c in candles:
-
-            closes.append(float(c[2]))
-
-        closes.reverse()
-
-        return closes
-
-    except:
-
-        return None
-
-# =========================================
-# RSI
-# =========================================
-
-def calculate_rsi(symbol, timeframe):
-
-    closes = get_klines(symbol, timeframe)
-
-    if closes is None:
-        return None
-
-    df = pd.DataFrame(closes, columns=["close"])
-
-    rsi = RSIIndicator(
-        close=df["close"],
-        window=14
-    ).rsi()
-
-    return round(rsi.iloc[-1], 2)
-
-# =========================================
-# EMA
-# =========================================
-
-def ema_cross(symbol, timeframe):
-
-    closes = get_klines(symbol, timeframe)
-
-    if closes is None:
-        return "خطا"
-
-    df = pd.DataFrame(closes, columns=["close"])
-
-    ema20 = EMAIndicator(
-        close=df["close"],
-        window=20
-    ).ema_indicator()
-
-    ema50 = EMAIndicator(
-        close=df["close"],
-        window=50
-    ).ema_indicator()
-
-    if ema20.iloc[-1] > ema50.iloc[-1]:
-
-        return "🟢 کراس صعودی"
-
-    else:
-
-        return "🔴 کراس نزولی"
-
-# =========================================
-# MARKET PRESSURE
-# =========================================
-
-def market_pressure(symbol, timeframe):
-
-    rsi = calculate_rsi(symbol, timeframe)
-
-    if rsi is None:
-        return "خطا"
-
-    if rsi >= 70:
-
-        return "🟢 فشار خرید"
-
-    elif rsi <= 30:
-
-        return "🔴 فشار فروش"
-
-    else:
-
-        return "⚪ خنثی"
-
-# =========================================
-# DIVERGENCE
-# =========================================
-
-def detect_divergence(symbol, timeframe):
-
-    closes = get_klines(symbol, timeframe)
-
-    if closes is None or len(closes) < 30:
-        return None
-
-    df = pd.DataFrame(closes, columns=["close"])
-
-    rsi = RSIIndicator(
-        close=df["close"],
-        window=14
-    ).rsi()
-
-    if (
-        df["close"].iloc[-1] < df["close"].iloc[-5]
-        and
-        rsi.iloc[-1] > rsi.iloc[-5]
-    ):
-
-        return "🟢 واگرایی مثبت"
-
-    elif (
-        df["close"].iloc[-1] > df["close"].iloc[-5]
-        and
-        rsi.iloc[-1] < rsi.iloc[-5]
-    ):
-
-        return "🔴 واگرایی منفی"
-
-    return None
-
-# =========================================
 # START
 # =========================================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     text = """
-🚀 Crypto AI Bot V7 PRO
+🚀 Crypto AI Bot PRO
 
 ━━━━━━━━━━━━━━
 
-✅ اسکنر خودکار
-✅ هشدار EMA
-✅ هشدار RSI
-✅ واگرایی RSI
-✅ تارگت حرفه‌ای
-✅ تحلیل مولتی تایم
+✅ EMA Scanner
+✅ RSI Scanner
+✅ Divergence Scanner
+✅ Auto Alerts
+✅ Multi Timeframe
+✅ Real Market Analysis
+✅ Real Target System
 
 ━━━━━━━━━━━━━━
 
@@ -350,44 +152,76 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def health(update):
 
-    text = """
+    api = api_health()
+
+    api_status = (
+        "🟢 سالم"
+        if api
+        else
+        "🔴 مشکل"
+    )
+
+    text = f"""
 🩺 سلامت ربات
 
-🟢 CoinGecko
-🟢 KuCoin
-🟢 RSI Engine
-🟢 EMA Engine
-🟢 Scanner
-🟢 Alerts
+━━━━━━━━━━━━━━
+
+CoinGecko:
+{api_status}
+
+KuCoin:
+{api_status}
+
+RSI Engine:
+🟢 سالم
+
+EMA Engine:
+🟢 سالم
+
+Scanner:
+🟢 فعال
+
+Alerts:
+🟢 فعال
+
+Targets:
+🟢 فعال
 """
 
     await update.message.reply_text(text)
 
 # =========================================
-# AUTO SCANNER
-# =========================================
-
-async def market_scanner(context):
-
-    print("SCANNER RUNNING...")
-
-# =========================================
 # MESSAGE HANDLER
 # =========================================
 
-async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def messages(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     text = update.message.text
 
     user_id = update.effective_user.id
 
+    # =====================================
+    # START
+    # =====================================
+
     if text == "🚀 شروع ربات":
 
         await start(update, context)
 
+    # =====================================
+    # HEALTH
+    # =====================================
+
     elif text == "🩺 سلامت ربات":
 
         await health(update)
+
+    # =====================================
+    # PRICE
+    # =====================================
 
     elif text == "💰 قیمت لحظه‌ای":
 
@@ -400,6 +234,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
+    # =====================================
+    # RSI
+    # =====================================
+
     elif text == "📈 RSI":
 
         user_state[user_id] = {
@@ -410,6 +248,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💎 ارز را انتخاب کن:",
             reply_markup=coin_keyboard()
         )
+
+    # =====================================
+    # EMA
+    # =====================================
 
     elif text == "⚡ EMA کراس":
 
@@ -422,6 +264,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
+    # =====================================
+    # PRESSURE
+    # =====================================
+
     elif text == "📦 فشار بازار":
 
         user_state[user_id] = {
@@ -432,6 +278,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💎 ارز را انتخاب کن:",
             reply_markup=coin_keyboard()
         )
+
+    # =====================================
+    # DIVERGENCE
+    # =====================================
 
     elif text == "📉 واگرایی RSI":
 
@@ -444,6 +294,25 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
+    # =====================================
+    # MULTI TF
+    # =====================================
+
+    elif text == "🧠 تحلیل مولتی تایم":
+
+        user_state[user_id] = {
+            "action": "multi"
+        }
+
+        await update.message.reply_text(
+            "💎 ارز را انتخاب کن:",
+            reply_markup=coin_keyboard()
+        )
+
+    # =====================================
+    # ANALYSIS
+    # =====================================
+
     elif text == "📊 تحلیل بازار":
 
         user_state[user_id] = {
@@ -455,32 +324,112 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=coin_keyboard()
         )
 
+    # =====================================
+    # TARGET
+    # =====================================
+
+    elif text == "🎯 تارگت گذاری":
+
+        user_state[user_id] = {
+            "action": "target"
+        }
+
+        await update.message.reply_text(
+            "💎 ارز را انتخاب کن:",
+            reply_markup=coin_keyboard()
+        )
+
+    # =====================================
+    # COIN SELECT
+    # =====================================
+
     elif text.startswith("💎"):
 
-        coin = text.replace("💎 ", "")
+        coin = text.replace(
+            "💎 ",
+            ""
+        )
+
+        if coin not in COINS:
+            return
 
         user_state[user_id]["coin"] = coin
+
+        action = user_state[user_id]["action"]
+
+        # =================================
+        # MULTI TF
+        # =================================
+
+        if action == "multi":
+
+            result = multi_timeframe_analysis(
+                coin
+            )
+
+            await update.message.reply_text(
+                result
+            )
+
+            return
 
         await update.message.reply_text(
             "⏰ تایم‌فریم را انتخاب کن:",
             reply_markup=timeframe_keyboard()
         )
 
+    # =====================================
+    # TIMEFRAME
+    # =====================================
+
     elif text.startswith("⏰"):
 
-        timeframe = text.replace("⏰ ", "")
+        timeframe = text.replace(
+            "⏰ ",
+            ""
+        )
 
         action = user_state[user_id]["action"]
 
         coin = user_state[user_id]["coin"]
+
+        # =================================
+        # TARGET
+        # =================================
+
+        if action == "target":
+
+            user_state[user_id]["timeframe"] = timeframe
+
+            user_state[user_id]["step"] = "target1"
+
+            await update.message.reply_text(
+                "🎯 Target 1 را وارد کن:"
+            )
+
+            return
+
+        # =================================
+        # PRICE
+        # =================================
 
         if action == "price":
 
             price = get_price(coin)
 
             await update.message.reply_text(
-                f"💰 {coin}\n\n{price} $"
+                f"""
+💰 قیمت لحظه‌ای
+
+💎 {coin}
+
+💵 {price} $
+"""
             )
+
+        # =================================
+        # RSI
+        # =================================
 
         elif action == "rsi":
 
@@ -490,8 +439,20 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             await update.message.reply_text(
-                f"📈 RSI\n\n💎 {coin}\n⏰ {timeframe}\n\n📊 {rsi}"
+                f"""
+📈 RSI
+
+💎 {coin}
+⏰ {timeframe}
+
+📊 RSI:
+{rsi}
+"""
             )
+
+        # =================================
+        # EMA
+        # =================================
 
         elif action == "ema":
 
@@ -501,8 +462,19 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             await update.message.reply_text(
-                f"⚡ EMA\n\n💎 {coin}\n⏰ {timeframe}\n\n{ema}"
+                f"""
+⚡ EMA
+
+💎 {coin}
+⏰ {timeframe}
+
+{ema}
+"""
             )
+
+        # =================================
+        # PRESSURE
+        # =================================
 
         elif action == "pressure":
 
@@ -512,12 +484,26 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             await update.message.reply_text(
-                f"📦 فشار بازار\n\n💎 {coin}\n⏰ {timeframe}\n\n{pressure}"
+                f"""
+📦 فشار بازار
+
+💎 {coin}
+⏰ {timeframe}
+
+{pressure}
+"""
             )
+
+        # =================================
+        # DIVERGENCE
+        # =================================
 
         elif action == "div":
 
-            if timeframe not in ["4H", "1D"]:
+            if timeframe not in [
+                "4H",
+                "1D"
+            ]:
 
                 await update.message.reply_text(
                     "❌ فقط 4H و 1D"
@@ -531,11 +517,23 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             if div is None:
+
                 div = "⚪ واگرایی یافت نشد"
 
             await update.message.reply_text(
-                f"📉 واگرایی RSI\n\n💎 {coin}\n⏰ {timeframe}\n\n{div}"
+                f"""
+📉 واگرایی RSI
+
+💎 {coin}
+⏰ {timeframe}
+
+{div}
+"""
             )
+
+        # =================================
+        # ANALYSIS
+        # =================================
 
         elif action == "analysis":
 
@@ -561,6 +559,8 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💎 {coin}
 ⏰ {timeframe}
 
+━━━━━━━━━━━━━━
+
 📈 RSI:
 {rsi}
 
@@ -571,6 +571,92 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 {pressure}
 """
             )
+
+    # =====================================
+    # TARGET INPUT
+    # =====================================
+
+    elif user_id in user_state:
+
+        if user_state[user_id].get("action") == "target":
+
+            state = user_state[user_id]
+
+            try:
+
+                value = float(text)
+
+            except:
+
+                await update.message.reply_text(
+                    "❌ عدد معتبر وارد کن"
+                )
+
+                return
+
+            # =================================
+            # TARGET 1
+            # =================================
+
+            if state["step"] == "target1":
+
+                state["target1"] = value
+
+                state["step"] = "target2"
+
+                await update.message.reply_text(
+                    "🎯 Target 2 را وارد کن:"
+                )
+
+                return
+
+            # =================================
+            # TARGET 2
+            # =================================
+
+            elif state["step"] == "target2":
+
+                state["target2"] = value
+
+                state["step"] = "target3"
+
+                await update.message.reply_text(
+                    "🎯 Target 3 را وارد کن:"
+                )
+
+                return
+
+            # =================================
+            # TARGET 3
+            # =================================
+
+            elif state["step"] == "target3":
+
+                state["target3"] = value
+
+                add_target(
+                    state["coin"],
+                    state["timeframe"],
+                    state["target1"],
+                    state["target2"],
+                    value
+                )
+
+                await update.message.reply_text(
+                    f"""
+✅ تارگت ذخیره شد
+
+💎 {state['coin']}
+⏰ {state['timeframe']}
+
+🎯 T1 → {state['target1']}
+🎯 T2 → {state['target2']}
+🎯 T3 → {value}
+""",
+                    reply_markup=main_menu
+                )
+
+                del user_state[user_id]
 
 # =========================================
 # MAIN
@@ -583,6 +669,10 @@ def main():
     app = Application.builder().token(
         BOT_TOKEN
     ).build()
+
+    # =====================================
+    # HANDLERS
+    # =====================================
 
     app.add_handler(
         CommandHandler(
@@ -598,10 +688,24 @@ def main():
         )
     )
 
+    # =====================================
+    # MARKET SCANNER
+    # =====================================
+
     app.job_queue.run_repeating(
         market_scanner,
+        interval=SCANNER_INTERVAL,
+        first=15
+    )
+
+    # =====================================
+    # TARGET SCANNER
+    # =====================================
+
+    app.job_queue.run_repeating(
+        check_targets,
         interval=60,
-        first=10
+        first=20
     )
 
     print("BOT RUNNING 🚀")
