@@ -18,3 +18,14 @@ def ema_cross(symbol, interval="15m"):
         return "bullish"
     else:
         return "bearish"
+
+
+def detect_divergence(symbol, interval="15m"):
+    df = get_klines(symbol, interval)
+
+    close = df[4].astype(float)
+
+    if close.iloc[-1] > close.iloc[-5]:
+        return "no_divergence"
+    else:
+        return "possible_divergence"
