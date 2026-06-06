@@ -32,9 +32,12 @@ def generate_signal(symbol):
 
     if score >= 4:
         signal = "🟢 خرید قوی"
+        direction = "buy"
     elif score <= -4:
         signal = "🔴 فروش قوی"
+        direction = "sell"
     else:
         signal = "🟡 ضعیف"
+        direction = None
 
-    return signal, rsi, reasons, score
+    return signal, rsi, reasons, score, direction
