@@ -17,7 +17,7 @@ def run_scanner(bot, chat_id):
                 signal, rsi, reasons, score = generate_signal(coin, "15m")
 
                 # فقط سیگنال قوی
-                if score >= 2 or score <= -2:
+                if score >= 3 or score <= -3:
 
                     # جلوگیری از تکرار پیام
                     if last_signal.get(coin) == signal:
