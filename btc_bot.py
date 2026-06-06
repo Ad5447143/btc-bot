@@ -1,11 +1,9 @@
+import threading
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from config import BOT_TOKEN
-
 from services.scanner import run_scanner
-
-import threading
 
 print("BOT STARTED 🚀")
 
@@ -13,29 +11,32 @@ print("BOT STARTED 🚀")
 # START COMMAND
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 ربات فعال شد و آماده است")
+    await update.message.reply_text("🤖 ربات فعال شد و آماده کار است")
 
 # =========================
-# MAIN
+# MAIN FUNCTION
 # =========================
 def main():
 
+    # ساخت اپلیکیشن
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # /start command
+    # هندلر /start
     app.add_handler(CommandHandler("start", start))
 
     # =========================
-    # SCANNER THREAD
+    # اجرای اسکنر در پس‌زمینه
     # =========================
-    threading.Thread(
+    scanner_thread = threading.Thread(
         target=run_scanner,
         args=(app.bot, 369031827),
         daemon=True
-    ).start()
+    )
+    scanner_thread.start()
 
     print("Bot is running...")
 
+    # اجرای ربات
     app.run_polling()
 
 # =========================
