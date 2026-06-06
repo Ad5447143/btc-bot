@@ -1,30 +1,38 @@
 import requests
 
-# تبدیل کوین به id کوین‌گکو
-COIN_MAP = {
-    "BTCUSDT": "bitcoin",
-    "ETHUSDT": "ethereum",
-    "BNBUSDT": "binancecoin",
-    "SOLUSDT": "solana",
-    "XRPUSDT": "ripple",
-    "DOGEUSDT": "dogecoin",
-    "ADAUSDT": "cardano",
-    "TRXUSDT": "tron"
-}
+def get_active_coins():
+    """
+    دریافت 20 کوین برتر از نظر حجم معاملات از CoinGecko
+    خروجی نمونه:
+    ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', ...]
+    """
 
-def get_price(symbol):
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+
+    params = {
+        "vs_currency": "usd",
+        "order": "volume_desc",
+        "per_page": 20,
+        "page": 1,
+        "sparkline": "false"
+    }
 
     try:
-        coin_id = COIN_MAP.get(symbol)
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
 
-        if not coin_id:
-            return None
+        data = response.json()
 
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
+        coins = []
 
-        data = requests.get(url).json()
+        for coin in data:
+            symbol = coin.get("symbol", "").upper()
 
-        return data[coin_id]["usd"]
+            if symbol:
+                coins.append(f"{symbol}USDT")
 
-    except:
-        return None
+        return coins
+
+    except Exception as e:
+        print(f"get_active_coins error: {e}")
+        return []
