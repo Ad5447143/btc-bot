@@ -1,15 +1,17 @@
-from services.analysis import calculate_rsi, ema_cross, detect_divergence
+from services.analysis import calculate_rsi, ema_cross, detect_divergence, is_ranging
 
-def generate_signal(symbol, timeframe="15m"):
+def generate_signal(symbol):
 
-    rsi = calculate_rsi(symbol, timeframe)
-    ema = ema_cross(symbol, timeframe)
-    div = detect_divergence(symbol, timeframe)
+    if is_ranging(symbol):
+        return "🟡 بازار رنج", 0, ["بازار بدون روند"], 0
+
+    rsi = calculate_rsi(symbol)
+    ema = ema_cross(symbol)
+    div = detect_divergence(symbol)
 
     score = 0
     reasons = []
 
-    # RSI
     if rsi < 30:
         score += 2
         reasons.append("RSI اشباع فروش")
@@ -17,7 +19,6 @@ def generate_signal(symbol, timeframe="15m"):
         score -= 2
         reasons.append("RSI اشباع خرید")
 
-    # EMA
     if ema == "bullish":
         score += 2
         reasons.append("EMA صعودی")
@@ -25,12 +26,10 @@ def generate_signal(symbol, timeframe="15m"):
         score -= 2
         reasons.append("EMA نزولی")
 
-    # Divergence
     if div == "bullish_divergence":
         score += 2
         reasons.append("واگرایی صعودی")
 
-    # نتیجه
     if score >= 4:
         signal = "🟢 خرید قوی"
     elif score <= -4:
