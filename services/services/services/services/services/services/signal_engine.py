@@ -26,14 +26,14 @@ def generate_signal(symbol, timeframe="15m"):
         reasons.append("EMA نزولی")
 
     # Divergence
-    if div == "possible_divergence":
-        score += 1
-        reasons.append("احتمال واگرایی")
+    if div == "bullish_divergence":
+        score += 2
+        reasons.append("واگرایی صعودی")
 
-    # نتیجه نهایی
-    if score >= 3:
+    # نتیجه
+    if score >= 4:
         signal = "🟢 خرید قوی"
-    elif score <= -3:
+    elif score <= -4:
         signal = "🔴 فروش قوی"
     else:
         signal = "🟡 ضعیف"
