@@ -1,10 +1,13 @@
 import time
+
 from config import COINS, SCANNER_INTERVAL
 from services.signal_engine import generate_signal
 from services.market import get_price
 from services.targets import set_target, check_targets
 
+
 last_signal = {}
+
 
 def run_scanner(bot, chat_id):
 
@@ -16,42 +19,72 @@ def run_scanner(bot, chat_id):
 
             for coin in COINS.keys():
 
-                signal, rsi, reasons, score, direction = generate_signal(coin)
+                # =========================
+                # SIGNAL ENGINE (VIP + NORMAL)
+                # =========================
+                signal, rsi, reasons, score, direction, is_vip = generate_signal(coin)
 
                 price = get_price(coin)
 
-                # بررسی تارگت
+                # =========================
+                # TARGET CHECK
+                # =========================
                 result = check_targets(coin, price)
-                if result:
-                    bot.send_message(chat_id, f"🚨 {coin}\n{result}")
 
-                # فقط سیگنال قوی
+                if result:
+                    bot.send_message(
+                        chat_id,
+                        f"""
+🚨 TARGET HIT
+
+💎 {coin}
+📊 {result}
+"""
+                    )
+
+                # =========================
+                # ONLY STRONG SIGNALS
+                # =========================
                 if score >= 4 or score <= -4:
 
+                    # جلوگیری از تکرار پیام
                     if last_signal.get(coin) == signal:
                         continue
 
                     last_signal[coin] = signal
 
-                    # تنظیم تارگت
-                    if direction:
+                    tp = "-"
+                    sl = "-"
+
+                    # =========================
+                    # SET TARGET (ONLY IF DIRECTION EXISTS)
+                    # =========================
+                    if direction and price:
+
                         tp, sl = set_target(coin, direction, price)
 
-                        msg = f"""
-🚨 سیگنال قوی
+                    # =========================
+                    # MESSAGE TYPE
+                    # =========================
+                    tag = "🔥 VIP SIGNAL" if is_vip else "📊 SIGNAL"
 
-💎 {coin}
-💰 قیمت: {price}
+                    msg = f"""
+{tag}
+
+💎 Coin: {coin}
+💰 Price: {price}
 
 📊 RSI: {rsi}
-📡 {signal}
+📡 Signal: {signal}
 
 🎯 TP: {tp}
 🛑 SL: {sl}
 
-🧠 {', '.join(reasons)}
+🧠 Reasons:
+{', '.join(reasons)}
 """
-                        bot.send_message(chat_id, msg)
+
+                    bot.send_message(chat_id, msg)
 
         except Exception as e:
             print("Scanner error:", e)
