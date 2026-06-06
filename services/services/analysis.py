@@ -6,16 +6,15 @@ def get_klines(symbol, interval="15m", limit=100):
     data = requests.get(url).json()
     return pd.DataFrame(data)
 
-def calculate_rsi(symbol, interval="15m"):
+def ema_cross(symbol, interval="15m"):
     df = get_klines(symbol, interval)
 
     close = df[4].astype(float)
-    delta = close.diff()
 
-    gain = (delta.where(delta > 0, 0)).mean()
-    loss = (-delta.where(delta < 0, 0)).mean()
+    ema_fast = close.ewm(span=9).mean()
+    ema_slow = close.ewm(span=21).mean()
 
-    rs = gain / loss if loss != 0 else 0
-    rsi = 100 - (100 / (1 + rs))
-
-    return round(rsi, 2)
+    if ema_fast.iloc[-1] > ema_slow.iloc[-1]:
+        return "bullish"
+    else:
+        return "bearish"
