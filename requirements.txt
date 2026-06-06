@@ -1,6 +1,0 @@
-python-telegram-bot[job-queue]==20.7
-tradingview-ta
-pandas
-numpy
-requests
-ta
