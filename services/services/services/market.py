@@ -1,9 +1,30 @@
 import requests
 
+# تبدیل کوین به id کوین‌گکو
+COIN_MAP = {
+    "BTCUSDT": "bitcoin",
+    "ETHUSDT": "ethereum",
+    "BNBUSDT": "binancecoin",
+    "SOLUSDT": "solana",
+    "XRPUSDT": "ripple",
+    "DOGEUSDT": "dogecoin",
+    "ADAUSDT": "cardano",
+    "TRXUSDT": "tron"
+}
+
 def get_price(symbol):
+
     try:
-        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+        coin_id = COIN_MAP.get(symbol)
+
+        if not coin_id:
+            return None
+
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
+
         data = requests.get(url).json()
-        return float(data["price"])
+
+        return data[coin_id]["usd"]
+
     except:
         return None
