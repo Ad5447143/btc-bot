@@ -1,30 +1,59 @@
 import requests
 import pandas as pd
 
-def get_klines(symbol, interval="15m", limit=50):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+COIN_MAP = {
+    "BTCUSDT": "bitcoin",
+    "ETHUSDT": "ethereum",
+    "BNBUSDT": "binancecoin",
+    "SOLUSDT": "solana",
+    "XRPUSDT": "ripple",
+    "DOGEUSDT": "dogecoin",
+    "ADAUSDT": "cardano",
+    "TRXUSDT": "tron"
+}
+
+def get_ohlc(symbol, days=1):
+
+    coin_id = COIN_MAP.get(symbol)
+
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days={days}"
+
     data = requests.get(url).json()
-    return pd.DataFrame(data)
 
-def calculate_rsi(symbol, interval="15m"):
-    df = get_klines(symbol, interval)
+    prices = data["prices"]
 
-    close = df[4].astype(float)
+    df = pd.DataFrame(prices, columns=["time", "price"])
+
+    return df
+
+# =====================
+# RSI واقعی (CoinGecko)
+# =====================
+
+def calculate_rsi(symbol):
+
+    df = get_ohlc(symbol)
+
+    close = df["price"]
+
     delta = close.diff()
 
     gain = (delta.where(delta > 0, 0)).mean()
     loss = (-delta.where(delta < 0, 0)).mean()
 
     rs = gain / loss if loss != 0 else 0
+
     return round(100 - (100 / (1 + rs)), 2)
 
-# =========================
+# =====================
 # EMA
-# =========================
-def ema_cross(symbol, interval="15m"):
-    df = get_klines(symbol, interval)
+# =====================
 
-    close = df[4].astype(float)
+def ema_cross(symbol):
+
+    df = get_ohlc(symbol)
+
+    close = df["price"]
 
     ema_fast = close.ewm(span=9).mean()
     ema_slow = close.ewm(span=21).mean()
@@ -34,20 +63,32 @@ def ema_cross(symbol, interval="15m"):
     else:
         return "bearish"
 
-# =========================
-# RSI DIVERGENCE (MVP REAL)
-# =========================
-def detect_divergence(symbol, interval="15m"):
+# =====================
+# Divergence ساده
+# =====================
 
-    df = get_klines(symbol, interval)
+def detect_divergence(symbol):
 
-    close = df[4].astype(float)
+    df = get_ohlc(symbol)
 
-    price_high = close.iloc[-1]
-    price_prev = close.iloc[-5]
+    close = df["price"]
 
-    # ساده ولی کاربردی
-    if price_high > price_prev:
+    if close.iloc[-1] > close.iloc[-5]:
         return "no_divergence"
     else:
         return "bullish_divergence"
+
+# =====================
+# بازار رنج
+# =====================
+
+def is_ranging(symbol):
+
+    df = get_ohlc(symbol)
+
+    high = df["price"].max()
+    low = df["price"].min()
+
+    range_percent = ((high - low) / low) * 100
+
+    return range_percent < 1.5
