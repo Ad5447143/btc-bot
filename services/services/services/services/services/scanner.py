@@ -2,6 +2,8 @@ import time
 from config import COINS, SCANNER_INTERVAL
 from services.signal_engine import generate_signal
 
+last_signal = {}
+
 def run_scanner(bot, chat_id):
 
     print("Scanner started...")
@@ -12,13 +14,19 @@ def run_scanner(bot, chat_id):
 
             for coin in COINS.keys():
 
-                signal, rsi, reasons = generate_signal(coin, "15m")
+                signal, rsi, reasons, score = generate_signal(coin, "15m")
 
-                # فقط سیگنال مهم
-                if signal != "🟡 خنثی":
+                # فقط سیگنال قوی
+                if score >= 2 or score <= -2:
+
+                    # جلوگیری از تکرار پیام
+                    if last_signal.get(coin) == signal:
+                        continue
+
+                    last_signal[coin] = signal
 
                     msg = f"""
-🚨 هشدار سیگنال
+🚨 سیگنال قوی
 
 💎 {coin}
 📊 RSI: {rsi}
