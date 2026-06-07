@@ -1,16 +1,17 @@
 import requests
 import pandas as pd
+
 from ta.momentum import RSIIndicator
 
 
 def get_price(symbol="bitcoin"):
 
-    url = (
-        "https://api.coingecko.com/api/v3/simple/price"
-        f"?ids={symbol}&vs_currencies=usd"
-    )
-
     try:
+
+        url = (
+            "https://api.coingecko.com/api/v3/simple/price"
+            f"?ids={symbol}&vs_currencies=usd"
+        )
 
         data = requests.get(
             url,
@@ -29,8 +30,8 @@ def get_rsi(symbol="bitcoin"):
     try:
 
         url = (
-            "https://api.coingecko.com/api/v3/coins/"
-            f"{symbol}/market_chart?vs_currency=usd&days=30"
+            f"https://api.coingecko.com/api/v3/coins/{symbol}"
+            "/market_chart?vs_currency=usd&days=30"
         )
 
         data = requests.get(
@@ -39,8 +40,8 @@ def get_rsi(symbol="bitcoin"):
         ).json()
 
         prices = [
-            p[1]
-            for p in data["prices"]
+            x[1]
+            for x in data["prices"]
         ]
 
         df = pd.DataFrame(
