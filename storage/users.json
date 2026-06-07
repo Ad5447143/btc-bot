@@ -1,6 +1,13 @@
 {
   "369031827": {
     "symbol": "BTCUSDT",
-    "timeframe": "1h"
+    "timeframe": "1h",
+
+    "vip": true,
+    "rsi": true,
+    "ema": true,
+    "divergence": true,
+    "price_target": true,
+    "rsi_target": true
   }
 }
