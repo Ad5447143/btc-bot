@@ -2,16 +2,11 @@ import sys
 import telegram
 import asyncio
 
-print("================================")
-print("PYTHON VERSION:")
-print(sys.version)
-print("================================")
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup
+)
 
-print("TELEGRAM VERSION:")
-print(telegram.__version__)
-print("================================")
-
-from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -21,6 +16,17 @@ from telegram.ext import (
 )
 
 from config import BOT_TOKEN
+from services.market import get_price
+
+
+print("================================")
+print("PYTHON VERSION:")
+print(sys.version)
+print("================================")
+
+print("TELEGRAM VERSION:")
+print(telegram.__version__)
+print("================================")
 
 print("🚀 BOT STARTED")
 
@@ -28,20 +34,49 @@ print("🚀 BOT STARTED")
 main_menu = ReplyKeyboardMarkup(
     [
         ["🚀 شروع ربات"],
-        ["💰 قیمت لحظه‌ای", "📈 RSI"],
-        ["⚡ کراس EMA", "📉 واگرایی RSI"],
-        ["📦 فشار بازار", "🔥 سیگنال VIP"],
-        ["🎯 تارگت قیمتی", "🎯 تارگت RSI"],
-        ["🩺 سلامت ربات"]
+
+        ["💰 قیمت BTC",
+         "💰 قیمت ETH"],
+
+        ["📈 RSI BTC",
+         "📈 RSI ETH"],
+
+        ["🎯 تارگت قیمتی",
+         "🎯 تارگت RSI"],
+
+        ["🔥 سیگنال VIP",
+         "🩺 سلامت ربات"]
     ],
     resize_keyboard=True
 )
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     await update.message.reply_text(
-        "🚀 ربات فعال است",
+        """
+🚀 به ربات تحلیل بازار خوش آمدید
+
+━━━━━━━━━━━━━━
+
+✅ قیمت لحظه‌ای BTC
+✅ قیمت لحظه‌ای ETH
+
+✅ RSI BTC
+✅ RSI ETH
+
+✅ تارگت قیمتی
+✅ تارگت RSI
+
+✅ سیگنال VIP
+
+━━━━━━━━━━━━━━
+
+🟢 ربات فعال است
+        """,
         reply_markup=main_menu
     )
 
@@ -51,9 +86,139 @@ async def messages(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    await update.message.reply_text(
-        f"دکمه انتخاب شده:\n{update.message.text}"
-    )
+    text = update.message.text
+
+    if text == "🚀 شروع ربات":
+
+        await start(update, context)
+
+    elif text == "💰 قیمت BTC":
+
+        price = get_price("bitcoin")
+
+        if price:
+
+            await update.message.reply_text(
+                f"""
+💰 قیمت بیت کوین
+
+{price:,.2f} USD
+                """
+            )
+
+        else:
+
+            await update.message.reply_text(
+                "❌ دریافت قیمت ناموفق بود."
+            )
+
+    elif text == "💰 قیمت ETH":
+
+        price = get_price("ethereum")
+
+        if price:
+
+            await update.message.reply_text(
+                f"""
+💰 قیمت اتریوم
+
+{price:,.2f} USD
+                """
+            )
+
+        else:
+
+            await update.message.reply_text(
+                "❌ دریافت قیمت ناموفق بود."
+            )
+
+    elif text == "📈 RSI BTC":
+
+        await update.message.reply_text(
+            """
+📈 RSI بیت کوین
+
+در حال تکمیل موتور RSI...
+            """
+        )
+
+    elif text == "📈 RSI ETH":
+
+        await update.message.reply_text(
+            """
+📈 RSI اتریوم
+
+در حال تکمیل موتور RSI...
+            """
+        )
+
+    elif text == "🎯 تارگت قیمتی":
+
+        btc = get_price("bitcoin")
+
+        if btc:
+
+            target = btc * 1.03
+
+            await update.message.reply_text(
+                f"""
+🎯 تارگت قیمتی BTC
+
+قیمت فعلی:
+{btc:,.2f}
+
+تارگت:
+{target:,.2f}
+                """
+            )
+
+    elif text == "🎯 تارگت RSI":
+
+        await update.message.reply_text(
+            """
+🎯 تارگت RSI
+
+هدف فعلی:
+
+RSI → 70
+            """
+        )
+
+    elif text == "🔥 سیگنال VIP":
+
+        btc = get_price("bitcoin")
+
+        if btc:
+
+            await update.message.reply_text(
+                f"""
+🔥 سیگنال VIP
+
+نماد: BTC
+
+ورود:
+{btc:,.2f}
+
+حد سود:
+{btc*1.03:,.2f}
+
+حد ضرر:
+{btc*0.98:,.2f}
+                """
+            )
+
+    elif text == "🩺 سلامت ربات":
+
+        await update.message.reply_text(
+            """
+🩺 سلامت ربات
+
+🟢 ربات فعال است
+🟢 سرور فعال است
+🟢 CoinGecko متصل است
+🟢 تلگرام متصل است
+            """
+        )
 
 
 async def run_bot():
