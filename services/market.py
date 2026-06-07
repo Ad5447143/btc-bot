@@ -4,68 +4,49 @@ import pandas as pd
 from ta.momentum import RSIIndicator
 from ta.trend import EMAIndicator
 
-
-BASE_URL = "https://api.bybit.com/v5/market/kline"
-
-
-TIMEFRAMES = {
-    "5m": "5",
-    "15m": "15",
-    "1h": "60",
-    "4h": "240",
-    "1d": "D"
-}
+from config import COINS
 
 
-def get_klines(
+def get_market_data(
     symbol="BTCUSDT",
-    timeframe="1h",
-    limit=200
+    days=30
 ):
 
     try:
 
-        interval = TIMEFRAMES[timeframe]
+        coin_id = COINS[symbol]
 
-        params = {
-            "category": "linear",
-            "symbol": symbol,
-            "interval": interval,
-            "limit": limit
-        }
+        url = (
+            f"https://api.coingecko.com/api/v3/coins/"
+            f"{coin_id}/market_chart"
+            f"?vs_currency=usd&days={days}"
+        )
 
         response = requests.get(
-            BASE_URL,
-            params=params,
-            timeout=15
+            url,
+            timeout=20
         )
 
         data = response.json()
 
-        candles = data["result"]["list"]
-
-        candles.reverse()
+        prices = [
+            x[1]
+            for x in data["prices"]
+        ]
 
         df = pd.DataFrame(
-            candles,
-            columns=[
-                "time",
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "turnover"
-            ]
+            prices,
+            columns=["close"]
         )
-
-        df["close"] = df["close"].astype(float)
-        df["high"] = df["high"].astype(float)
-        df["low"] = df["low"].astype(float)
 
         return df
 
-    except:
+    except Exception as e:
+
+        print(
+            "COINGECKO ERROR:",
+            e
+        )
 
         return None
 
@@ -76,17 +57,29 @@ def get_price(
 
     try:
 
-        df = get_klines(
-            symbol,
-            "5m",
-            2
+        coin_id = COINS[symbol]
+
+        url = (
+            "https://api.coingecko.com/api/v3/simple/price"
+            f"?ids={coin_id}"
+            "&vs_currencies=usd"
         )
+
+        data = requests.get(
+            url,
+            timeout=10
+        ).json()
 
         return float(
-            df["close"].iloc[-1]
+            data[coin_id]["usd"]
         )
 
-    except:
+    except Exception as e:
+
+        print(
+            "PRICE ERROR:",
+            e
+        )
 
         return None
 
@@ -98,9 +91,8 @@ def get_rsi(
 
     try:
 
-        df = get_klines(
-            symbol,
-            timeframe
+        df = get_market_data(
+            symbol
         )
 
         rsi = RSIIndicator(
@@ -109,11 +101,18 @@ def get_rsi(
         ).rsi()
 
         return round(
-            float(rsi.iloc[-1]),
+            float(
+                rsi.iloc[-1]
+            ),
             2
         )
 
-    except:
+    except Exception as e:
+
+        print(
+            "RSI ERROR:",
+            e
+        )
 
         return None
 
@@ -125,9 +124,8 @@ def get_ema20(
 
     try:
 
-        df = get_klines(
-            symbol,
-            timeframe
+        df = get_market_data(
+            symbol
         )
 
         ema = EMAIndicator(
@@ -136,11 +134,18 @@ def get_ema20(
         ).ema_indicator()
 
         return round(
-            float(ema.iloc[-1]),
-            2
+            float(
+                ema.iloc[-1]
+            ),
+            4
         )
 
-    except:
+    except Exception as e:
+
+        print(
+            "EMA20 ERROR:",
+            e
+        )
 
         return None
 
@@ -152,9 +157,8 @@ def get_ema50(
 
     try:
 
-        df = get_klines(
-            symbol,
-            timeframe
+        df = get_market_data(
+            symbol
         )
 
         ema = EMAIndicator(
@@ -163,11 +167,18 @@ def get_ema50(
         ).ema_indicator()
 
         return round(
-            float(ema.iloc[-1]),
-            2
+            float(
+                ema.iloc[-1]
+            ),
+            4
         )
 
-    except:
+    except Exception as e:
+
+        print(
+            "EMA50 ERROR:",
+            e
+        )
 
         return None
 
@@ -211,9 +222,8 @@ def get_ema_cross(
 
     try:
 
-        df = get_klines(
-            symbol,
-            timeframe
+        df = get_market_data(
+            symbol
         )
 
         ema20 = EMAIndicator(
@@ -242,7 +252,12 @@ def get_ema_cross(
 
         return None
 
-    except:
+    except Exception as e:
+
+        print(
+            "CROSS ERROR:",
+            e
+        )
 
         return None
 
@@ -254,10 +269,8 @@ def get_divergence(
 
     try:
 
-        df = get_klines(
-            symbol,
-            timeframe,
-            60
+        df = get_market_data(
+            symbol
         )
 
         rsi = RSIIndicator(
@@ -271,16 +284,29 @@ def get_divergence(
         rsi_last = rsi.iloc[-1]
         rsi_old = rsi.iloc[-15]
 
-        if price_last < price_old and rsi_last > rsi_old:
+        if (
+            price_last < price_old
+            and
+            rsi_last > rsi_old
+        ):
 
             return "واگرایی مثبت"
 
-        if price_last > price_old and rsi_last < rsi_old:
+        if (
+            price_last > price_old
+            and
+            rsi_last < rsi_old
+        ):
 
             return "واگرایی منفی"
 
         return None
 
-    except:
+    except Exception as e:
+
+        print(
+            "DIVERGENCE ERROR:",
+            e
+        )
 
         return None
