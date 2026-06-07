@@ -1,149 +1,171 @@
-from services.market import (
-    get_rsi,
-    get_ema_cross,
-    get_divergence
-)
-
 from config import COINS
 
+from services.market import (
+get_price,
+get_rsi,
+get_ema_signal,
+get_ema_cross,
+get_divergence
+)
 
-async def send_auto_alerts(context):
+def calculate_score(signal):
 
-    users = load_users()
+```
+score = 0
 
-    for chat_id, settings in users.items():
+if signal["rsi"] < 30:
+    score += 3
 
-        symbol = settings.get(
-            "symbol",
-            "BTCUSDT"
+elif signal["rsi"] > 70:
+    score += 3
+
+if signal["ema_signal"] == "صعودی":
+    score += 2
+
+if signal["ema_cross"] == "کراس صعودی":
+    score += 2
+
+if signal["divergence"] == "واگرایی مثبت":
+    score += 3
+
+return score
+```
+
+def get_vip_signals():
+
+```
+results = []
+
+for symbol in COINS.keys():
+
+    try:
+
+        price = get_price(symbol)
+
+        rsi = get_rsi(symbol)
+
+        ema_signal = get_ema_signal(symbol)
+
+        ema_cross = get_ema_cross(symbol)
+
+        divergence = get_divergence(symbol)
+
+        signal = {
+            "symbol": symbol,
+            "timeframe": "1h",
+            "price": price,
+            "rsi": rsi,
+            "ema_signal": ema_signal,
+            "ema_cross": ema_cross,
+            "divergence": divergence
+        }
+
+        signal["score"] = calculate_score(signal)
+
+        if signal["score"] >= 5:
+
+            signal["signal"] = "BUY"
+
+            results.append(signal)
+
+    except Exception as e:
+
+        print(
+            "SCANNER ERROR:",
+            e
         )
 
-        timeframe = settings.get(
-            "timeframe",
-            "1h"
-        )
+results.sort(
+    key=lambda x: x["score"],
+    reverse=True
+)
 
-        try:
+return results
+```
 
-            # RSI ALERT
+def get_best_signal():
 
-            if settings.get(
-                "rsi",
-                True
-            ):
+```
+signals = get_vip_signals()
 
-                rsi = get_rsi(
-                    symbol,
-                    timeframe
-                )
+if not signals:
+    return None
 
-                if rsi:
+return signals[0]
+```
 
-                    if rsi >= 70:
+def format_vip_signal(signal):
 
-                        await context.bot.send_message(
-                            chat_id=int(chat_id),
-                            text=f"""
-🔥 هشدار RSI
+```
+if not signal:
 
-نماد:
-{symbol}
+    return "❌ سیگنالی پیدا نشد"
 
-تایم فریم:
-{timeframe}
+return f"""
+```
 
-RSI:
-{rsi}
+🔥 سیگنال VIP
 
-وضعیت:
-اشباع خرید
+━━━━━━━━━━━━━━
+
+🪙 نماد:
+{signal['symbol']}
+
+💰 قیمت:
+{signal['price']}
+
+📈 RSI:
+{signal['rsi']}
+
+⚡ روند EMA:
+{signal['ema_signal']}
+
+⚡ کراس EMA:
+{signal['ema_cross']}
+
+📉 واگرایی:
+{signal['divergence']}
+
+🎯 امتیاز:
+{signal['score']}
+
+🚀 نتیجه:
+{signal['signal']}
 """
-                        )
 
-                    elif rsi <= 30:
+def format_market_summary():
 
-                        await context.bot.send_message(
-                            chat_id=int(chat_id),
-                            text=f"""
-🟢 هشدار RSI
+```
+text = "📊 خلاصه بازار\n\n"
 
-نماد:
-{symbol}
+for symbol in COINS.keys():
 
-تایم فریم:
-{timeframe}
+    try:
 
-RSI:
-{rsi}
+        price = get_price(symbol)
 
-وضعیت:
-اشباع فروش
+        rsi = get_rsi(symbol)
+
+        trend = get_ema_signal(symbol)
+
+        text += f"""
+```
+
+🪙 {symbol}
+
+💰 {price}
+
+📈 RSI: {rsi}
+
+⚡ روند: {trend}
+
+━━━━━━━━━━━━━━
 """
-                        )
 
-            # EMA CROSS ALERT
+```
+    except:
 
-            if settings.get(
-                "ema",
-                True
-            ):
+        pass
 
-                cross = get_ema_cross(
-                    symbol,
-                    timeframe
-                )
-
-                if cross:
-
-                    await context.bot.send_message(
-                        chat_id=int(chat_id),
-                        text=f"""
-⚡ هشدار کراس EMA
-
-نماد:
-{symbol}
-
-تایم فریم:
-{timeframe}
-
-نتیجه:
-{cross}
-"""
-                    )
-
-            # DIVERGENCE ALERT
-
-            if settings.get(
-                "divergence",
-                True
-            ):
-
-                divergence = get_divergence(
-                    symbol,
-                    timeframe
-                )
-
-                if divergence:
-
-                    await context.bot.send_message(
-                        chat_id=int(chat_id),
-                        text=f"""
-📉 هشدار واگرایی
-
-نماد:
-{symbol}
-
-تایم فریم:
-{timeframe}
-
-نتیجه:
-{divergence}
-"""
-                    )
-
-        except Exception as e:
-
-            print(
-                "AUTO ALERT ERROR:",
-                e
-            )
+return text
+```
