@@ -1,3 +1,31 @@
+import sys
+import telegram
+
+print("================================")
+print("PYTHON VERSION:")
+print(sys.version)
+print("================================")
+
+print("TELEGRAM VERSION:")
+print(telegram.__version__)
+print("================================")
+
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup
+)
+
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
+
+from config import BOT_TOKEN
+
+print("🚀 BOT STARTED")
 from telegram import (
     Update,
     ReplyKeyboardMarkup
