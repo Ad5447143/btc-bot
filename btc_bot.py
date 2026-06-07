@@ -1,5 +1,8 @@
-import threading
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup
+)
+
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -9,126 +12,160 @@ from telegram.ext import (
 )
 
 from config import BOT_TOKEN
-from services.scanner import run_scanner
-from services.signal_engine import generate_signal
-from services.market import get_price
-from services.analysis import calculate_rsi, ema_cross
 
-print("BOT STARTED 🚀")
+print("🚀 BOT STARTED")
 
-# =========================
-# MAIN MENU
-# =========================
+
 main_menu = ReplyKeyboardMarkup(
     [
-        ["📊 سیگنال بازار", "💰 قیمت"],
-        ["📈 RSI", "⚡ EMA"],
-        ["📉 واگرایی", "🩺 سلامت ربات"]
+        ["🚀 شروع ربات"],
+
+        ["💰 قیمت لحظه‌ای",
+         "📈 RSI"],
+
+        ["⚡ کراس EMA",
+         "📉 واگرایی RSI"],
+
+        ["📦 فشار بازار",
+         "🔥 سیگنال VIP"],
+
+        ["🎯 تارگت قیمتی",
+         "🎯 تارگت RSI"],
+
+        ["🩺 سلامت ربات"]
     ],
     resize_keyboard=True
 )
 
-# =========================
-# START
-# =========================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = """
-🤖 Crypto AI Bot
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-📊 تحلیل حرفه‌ای بازار
-📈 RSI + EMA + Divergence
-🚨 اسکن خودکار
+    await update.message.reply_text(
+        """
+🚀 به ربات تحلیل بازار خوش آمدید
 
-👇 یکی از گزینه‌ها را انتخاب کن
-"""
+━━━━━━━━━━━━━━
 
-    await update.message.reply_text(text, reply_markup=main_menu)
+✅ قیمت لحظه‌ای
+✅ RSI
+✅ کراس EMA
+✅ واگرایی RSI
+✅ سیگنال VIP
+✅ تارگت قیمتی
+✅ تارگت RSI
 
-# =========================
-# MESSAGE HANDLER
-# =========================
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+━━━━━━━━━━━━━━
+
+🟢 ربات فعال است
+        """,
+        reply_markup=main_menu
+    )
+
+
+async def messages(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     text = update.message.text
 
-    if text == "📊 سیگنال بازار":
+    if text == "🚀 شروع ربات":
 
-        signal, rsi, reasons, score = generate_signal("BTCUSDT")
-
-        await update.message.reply_text(
-            f"""
-🚨 سیگنال BTCUSDT
-
-📊 RSI: {rsi}
-📡 {signal}
-
-🧠 دلایل:
-{', '.join(reasons)}
-"""
+        await start(
+            update,
+            context
         )
-
-    elif text == "💰 قیمت":
-
-        price = get_price("BTCUSDT")
-
-        await update.message.reply_text(f"💰 BTCUSDT: {price}")
-
-    elif text == "📈 RSI":
-
-        rsi = calculate_rsi("BTCUSDT")
-
-        await update.message.reply_text(f"📊 RSI: {rsi}")
-
-    elif text == "⚡ EMA":
-
-        ema = ema_cross("BTCUSDT")
-
-        await update.message.reply_text(f"⚡ EMA: {ema}")
-
-    elif text == "📉 واگرایی":
-
-        await update.message.reply_text("📉 این بخش در مرحله بعد کامل می‌شود")
 
     elif text == "🩺 سلامت ربات":
 
         await update.message.reply_text(
             """
-🩺 وضعیت ربات
+🩺 سلامت ربات
 
-🟢 Bot: فعال
-🟢 Scanner: روشن
-🟢 API: سالم
-🟢 Engine: فعال
-"""
+🟢 ربات فعال است
+🟢 اسکنر فعال است
+🟢 موتور تحلیل فعال است
+            """
         )
 
-# =========================
-# MAIN
-# =========================
+    elif text == "💰 قیمت لحظه‌ای":
+
+        await update.message.reply_text(
+            "💰 بخش قیمت لحظه‌ای در حال تکمیل است."
+        )
+
+    elif text == "📈 RSI":
+
+        await update.message.reply_text(
+            "📈 بخش RSI در حال تکمیل است."
+        )
+
+    elif text == "⚡ کراس EMA":
+
+        await update.message.reply_text(
+            "⚡ بخش EMA در حال تکمیل است."
+        )
+
+    elif text == "📉 واگرایی RSI":
+
+        await update.message.reply_text(
+            "📉 بخش واگرایی در حال تکمیل است."
+        )
+
+    elif text == "📦 فشار بازار":
+
+        await update.message.reply_text(
+            "📦 بخش فشار بازار در حال تکمیل است."
+        )
+
+    elif text == "🔥 سیگنال VIP":
+
+        await update.message.reply_text(
+            "🔥 بخش سیگنال VIP در حال تکمیل است."
+        )
+
+    elif text == "🎯 تارگت قیمتی":
+
+        await update.message.reply_text(
+            "🎯 بخش تارگت قیمتی در حال تکمیل است."
+        )
+
+    elif text == "🎯 تارگت RSI":
+
+        await update.message.reply_text(
+            "🎯 بخش تارگت RSI در حال تکمیل است."
+        )
+
+
 def main():
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = (
+        ApplicationBuilder()
+        .token(BOT_TOKEN)
+        .build()
+    )
 
-    # /start
-    app.add_handler(CommandHandler("start", start))
+    app.add_handler(
+        CommandHandler(
+            "start",
+            start
+        )
+    )
 
-    # پیام‌ها
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT,
+            messages
+        )
+    )
 
-    # =========================
-    # SCANNER THREAD
-    # =========================
-    threading.Thread(
-        target=run_scanner,
-        args=(app.bot, 369031827),
-        daemon=True
-    ).start()
-
-    print("Bot is running...")
+    print("🚀 Bot Running")
 
     app.run_polling()
 
-# =========================
+
 if __name__ == "__main__":
     main()
