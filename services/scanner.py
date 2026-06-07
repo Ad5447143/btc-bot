@@ -18,7 +18,10 @@ TIMEFRAMES = [
 ]
 
 
-def analyze_symbol(symbol, timeframe="1h"):
+def analyze_symbol(
+    symbol,
+    timeframe="1h"
+):
 
     try:
 
@@ -51,47 +54,59 @@ def analyze_symbol(symbol, timeframe="1h"):
         if rsi is not None:
 
             if rsi < 30:
+
                 score += 1
 
             elif rsi > 70:
+
                 score -= 1
 
         # EMA TREND
 
         if ema_signal == "صعودی":
+
             score += 1
 
         elif ema_signal == "نزولی":
+
             score -= 1
 
         # EMA CROSS
 
         if ema_cross == "کراس صعودی":
+
             score += 1
 
         elif ema_cross == "کراس نزولی":
+
             score -= 1
 
         # DIVERGENCE
 
         if divergence == "واگرایی مثبت":
+
             score += 1
 
         elif divergence == "واگرایی منفی":
+
             score -= 1
 
         signal = "خنثی"
 
         if score >= 3:
+
             signal = "خرید قوی"
 
         elif score == 2:
+
             signal = "خرید"
 
         elif score <= -3:
+
             signal = "فروش قوی"
 
         elif score == -2:
+
             signal = "فروش"
 
         return {
@@ -108,7 +123,10 @@ def analyze_symbol(symbol, timeframe="1h"):
 
     except Exception as e:
 
-        print("SCAN ERROR:", e)
+        print(
+            "SCAN ERROR:",
+            e
+        )
 
         return None
 
@@ -117,7 +135,7 @@ def scan_market():
 
     results = []
 
-    for symbol in COINS.values():
+    for symbol in COINS.keys():
 
         for timeframe in TIMEFRAMES:
 
@@ -139,22 +157,22 @@ def get_vip_signals():
 
     results = scan_market()
 
-    vip_signals = []
+    signals = []
 
     for item in results:
 
         if item["score"] >= 3:
 
-            vip_signals.append(
+            signals.append(
                 item
             )
 
-    vip_signals.sort(
+    signals.sort(
         key=lambda x: x["score"],
         reverse=True
     )
 
-    return vip_signals
+    return signals
 
 
 def get_best_signal():
@@ -198,40 +216,46 @@ def get_market_summary():
     }
 
 
-def format_vip_signal(signal):
+def format_vip_signal(
+    signal
+):
 
     if not signal:
 
-        return "❌ سیگنال معتبری یافت نشد"
+        return """
+❌ سیگنال معتبری پیدا نشد
+"""
 
     return f"""
 🔥 سیگنال VIP
 
-نماد:
+━━━━━━━━━━━━━━
+
+🪙 نماد:
 {signal['symbol']}
 
-تایم فریم:
+⏱ تایم فریم:
 {signal['timeframe']}
 
-قیمت:
-{signal['price']:.4f}
+💰 قیمت:
+{signal['price']}
 
-RSI:
+📈 RSI:
 {signal['rsi']}
 
-EMA:
+⚡ روند EMA:
 {signal['ema_signal']}
 
-کراس EMA:
+⚡ کراس EMA:
 {signal['ema_cross']}
 
-واگرایی:
+📉 واگرایی:
 {signal['divergence']}
 
-امتیاز:
+🎯 امتیاز:
 {signal['score']}
 
-سیگنال:
+🚀 نتیجه:
 {signal['signal']}
 """
 
@@ -242,6 +266,8 @@ def format_market_summary():
 
     return f"""
 📊 خلاصه بازار
+
+━━━━━━━━━━━━━━
 
 🟢 صعودی:
 {summary['bullish']}
