@@ -7,7 +7,7 @@ last_signals = {}
 
 def run_scanner():
 
-    print("🚀 Scanner Started")
+    print("🚀 اسکنر فعال شد")
 
     while True:
 
@@ -15,23 +15,41 @@ def run_scanner():
 
             for coin in COINS.keys():
 
-                signal, score = generate_signal(coin)
+                signal, score, reasons = generate_signal(coin)
 
-                if score >= 4:
+                if signal == "❌ NO SIGNAL":
+                    continue
 
-                    if last_signals.get(coin) == signal:
-                        continue
+                old_signal = last_signals.get(coin)
 
-                    last_signals[coin] = signal
+                if old_signal == signal:
+                    continue
 
-                    print(
-                        f"🟢 {coin} | Signal Score: {score}"
-                    )
+                last_signals[coin] = signal
+
+                print(
+                    f"""
+━━━━━━━━━━━━━━
+
+💎 {coin}
+
+{signal}
+
+🎯 امتیاز:
+{score}
+
+📋 دلایل:
+
+{chr(10).join(reasons)}
+
+━━━━━━━━━━━━━━
+"""
+                )
 
         except Exception as e:
 
             print(
-                f"Scanner Error: {e}"
+                f"خطای اسکنر: {e}"
             )
 
         time.sleep(300)
