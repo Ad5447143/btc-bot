@@ -5,12 +5,12 @@ ADMIN_ID = 369031827
 SCANNER_INTERVAL = 300
 
 COINS = {
-    "BTCUSDT": "BTCUSDT",
-    "ETHUSDT": "ETHUSDT",
-    "BNBUSDT": "BNBUSDT",
-    "SOLUSDT": "SOLUSDT",
-    "XRPUSDT": "XRPUSDT",
-    "DOGEUSDT": "DOGEUSDT",
-    "ADAUSDT": "ADAUSDT",
-    "TRXUSDT": "TRXUSDT"
+    "BTCUSDT": "bitcoin",
+    "ETHUSDT": "ethereum",
+    "BNBUSDT": "binancecoin",
+    "SOLUSDT": "solana",
+    "XRPUSDT": "ripple",
+    "DOGEUSDT": "dogecoin",
+    "ADAUSDT": "cardano",
+    "TRXUSDT": "tron"
 }
