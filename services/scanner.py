@@ -1,55 +1,170 @@
-import time
+from services.market import (
+    get_price,
+    get_rsi,
+    get_ema_signal,
+    get_ema_cross,
+    get_divergence
+)
 
 from config import COINS
-from services.signal_engine import generate_signal
 
-last_signals = {}
 
-def run_scanner():
+TIMEFRAMES = [
+    "5m",
+    "15m",
+    "1h",
+    "4h",
+    "1d"
+]
 
-    print("🚀 اسکنر فعال شد")
 
-    while True:
+def analyze_symbol(
+    symbol,
+    timeframe="1h"
+):
 
-        try:
+    try:
 
-            for coin in COINS.keys():
+        score = 0
 
-                signal, score, reasons = generate_signal(coin)
+        price = get_price(symbol)
 
-                if signal == "❌ NO SIGNAL":
-                    continue
+        rsi = get_rsi(
+            symbol,
+            timeframe
+        )
 
-                old_signal = last_signals.get(coin)
+        ema_signal = get_ema_signal(
+            symbol,
+            timeframe
+        )
 
-                if old_signal == signal:
-                    continue
+        ema_cross = get_ema_cross(
+            symbol,
+            timeframe
+        )
 
-                last_signals[coin] = signal
+        divergence = get_divergence(
+            symbol,
+            timeframe
+        )
 
-                print(
-                    f"""
-━━━━━━━━━━━━━━
+        # RSI
 
-💎 {coin}
+        if rsi:
 
-{signal}
+            if rsi < 30:
 
-🎯 امتیاز:
-{score}
+                score += 1
 
-📋 دلایل:
+            elif rsi > 70:
 
-{chr(10).join(reasons)}
+                score -= 1
 
-━━━━━━━━━━━━━━
-"""
-                )
+        # EMA
 
-        except Exception as e:
+        if ema_signal == "صعودی":
 
-            print(
-                f"خطای اسکنر: {e}"
+            score += 1
+
+        elif ema_signal == "نزولی":
+
+            score -= 1
+
+        # EMA CROSS
+
+        if ema_cross == "کراس صعودی":
+
+            score += 1
+
+        elif ema_cross == "کراس نزولی":
+
+            score -= 1
+
+        # DIVERGENCE
+
+        if divergence == "واگرایی مثبت":
+
+            score += 1
+
+        elif divergence == "واگرایی منفی":
+
+            score -= 1
+
+        signal = "خنثی"
+
+        if score >= 3:
+
+            signal = "خرید قوی"
+
+        elif score == 2:
+
+            signal = "خرید"
+
+        elif score <= -3:
+
+            signal = "فروش قوی"
+
+        elif score == -2:
+
+            signal = "فروش"
+
+        return {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "price": price,
+            "rsi": rsi,
+            "ema_signal": ema_signal,
+            "ema_cross": ema_cross,
+            "divergence": divergence,
+            "score": score,
+            "signal": signal
+        }
+
+    except:
+
+        return None
+
+
+def scan_market():
+
+    results = []
+
+    for symbol in COINS:
+
+        for timeframe in TIMEFRAMES:
+
+            result = analyze_symbol(
+                symbol,
+                timeframe
             )
 
-        time.sleep(300)
+            if result:
+
+                results.append(
+                    result
+                )
+
+    return results
+
+
+def get_vip_signals():
+
+    signals = []
+
+    results = scan_market()
+
+    for item in results:
+
+        if item["score"] >= 3:
+
+            signals.append(
+                item
+            )
+
+    signals.sort(
+        key=lambda x: x["score"],
+        reverse=True
+    )
+
+    return signals
