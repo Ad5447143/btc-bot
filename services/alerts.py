@@ -1,7 +1,7 @@
 import json
 import os
 
-from scanner import (
+from services.scanner import (
     get_vip_signals
 )
 
@@ -32,6 +32,11 @@ def load_users():
 
 def save_users(data):
 
+    os.makedirs(
+        "storage",
+        exist_ok=True
+    )
+
     with open(
         USERS_FILE,
         "w",
@@ -56,6 +61,10 @@ def register_user(chat_id):
 
         users[chat_id] = {
 
+            "symbol": "BTCUSDT",
+
+            "timeframe": "1h",
+
             "vip": True,
 
             "rsi": True,
@@ -72,6 +81,56 @@ def register_user(chat_id):
         save_users(users)
 
 
+def get_user_settings(chat_id):
+
+    users = load_users()
+
+    return users.get(
+        str(chat_id),
+        {}
+    )
+
+
+def set_symbol(
+    chat_id,
+    symbol
+):
+
+    users = load_users()
+
+    chat_id = str(chat_id)
+
+    if chat_id not in users:
+
+        register_user(chat_id)
+
+        users = load_users()
+
+    users[chat_id]["symbol"] = symbol
+
+    save_users(users)
+
+
+def set_timeframe(
+    chat_id,
+    timeframe
+):
+
+    users = load_users()
+
+    chat_id = str(chat_id)
+
+    if chat_id not in users:
+
+        register_user(chat_id)
+
+        users = load_users()
+
+    users[chat_id]["timeframe"] = timeframe
+
+    save_users(users)
+
+
 def toggle_alert(
     chat_id,
     alert_name
@@ -85,7 +144,10 @@ def toggle_alert(
 
         return False
 
-    current = users[chat_id][alert_name]
+    current = users[chat_id].get(
+        alert_name,
+        True
+    )
 
     users[chat_id][alert_name] = not current
 
@@ -94,23 +156,7 @@ def toggle_alert(
     return users[chat_id][alert_name]
 
 
-def get_user_settings(
-    chat_id
-):
-
-    users = load_users()
-
-    chat_id = str(chat_id)
-
-    return users.get(
-        chat_id,
-        {}
-    )
-
-
-async def send_vip_alerts(
-    context
-):
+async def send_vip_alerts(context):
 
     users = load_users()
 
@@ -120,9 +166,9 @@ async def send_vip_alerts(
 
         return
 
-    top_signals = signals[:5]
+    signals = signals[:5]
 
-    for signal in top_signals:
+    for signal in signals:
 
         text = f"""
 🔥 سیگنال VIP
@@ -142,6 +188,9 @@ RSI:
 EMA:
 {signal['ema_signal']}
 
+کراس EMA:
+{signal['ema_cross']}
+
 واگرایی:
 {signal['divergence']}
 
@@ -152,20 +201,24 @@ EMA:
 {signal['signal']}
 """
 
-        for chat_id in users:
+        for chat_id, settings in users.items():
 
-            if users[chat_id].get(
+            if not settings.get(
                 "vip",
                 True
             ):
+                continue
 
-                try:
+            try:
 
-                    await context.bot.send_message(
-                        chat_id=int(chat_id),
-                        text=text
-                    )
+                await context.bot.send_message(
+                    chat_id=int(chat_id),
+                    text=text
+                )
 
-                except:
+            except Exception as e:
 
-                    pass
+                print(
+                    "VIP ALERT ERROR:",
+                    e
+                )
