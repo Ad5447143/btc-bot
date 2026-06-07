@@ -572,7 +572,17 @@ async def main():
         startup_message,
         when=5
     )
+app.job_queue.run_repeating(
+    send_vip_alerts,
+    interval=300,
+    first=60
+)
 
+app.job_queue.run_repeating(
+    send_auto_alerts,
+    interval=300,
+    first=120
+)
     print("🚀 Bot Running")
 
     await app.initialize()
