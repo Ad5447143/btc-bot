@@ -1,6 +1,6 @@
-import sys
-import telegram
 import asyncio
+import json
+import os
 
 from telegram import (
     Update,
@@ -15,43 +15,123 @@ from telegram.ext import (
     filters
 )
 
-from config import BOT_TOKEN
+from config import (
+    BOT_TOKEN,
+    SCANNER_INTERVAL,
+    COINS
+)
 
 from services.market import (
     get_price,
-    get_rsi
+    get_rsi,
+    get_ema_signal,
+    get_ema_cross,
+    get_divergence
 )
 
-print("================================")
-print("PYTHON VERSION:")
-print(sys.version)
-print("================================")
+from services.scanner import (
+    get_best_signal,
+    format_vip_signal,
+    format_market_summary
+)
 
-print("TELEGRAM VERSION:")
-print(telegram.__version__)
-print("================================")
+from services.alerts import (
+    register_user,
+    get_user_settings,
+    set_symbol,
+    set_timeframe,
+    send_vip_alerts
+)
 
-print("🚀 BOT STARTED")
+
+USERS_FILE = "storage/users.json"
 
 
-main_menu = ReplyKeyboardMarkup(
+TIMEFRAMES = [
+    "5m",
+    "15m",
+    "1h",
+    "4h",
+    "1d"
+]
+
+
+MAIN_MENU = ReplyKeyboardMarkup(
     [
         ["🚀 شروع ربات"],
 
-        ["💰 قیمت BTC",
-         "💰 قیمت ETH"],
+        ["💰 قیمت لحظه‌ای",
+         "📈 RSI"],
 
-        ["📈 RSI BTC",
-         "📈 RSI ETH"],
+        ["⚡ روند EMA",
+         "⚡ کراس EMA"],
 
-        ["🎯 تارگت قیمتی",
-         "🎯 تارگت RSI"],
+        ["📉 واگرایی RSI",
+         "📊 خلاصه بازار"],
 
         ["🔥 سیگنال VIP",
-         "🩺 سلامت ربات"]
+         "🎯 تارگت قیمتی"],
+
+        ["🎯 تارگت RSI",
+         "⚙️ تنظیمات"],
+
+        ["🩺 سلامت ربات"]
     ],
     resize_keyboard=True
 )
+
+
+SETTINGS_MENU = ReplyKeyboardMarkup(
+    [
+        ["🪙 انتخاب ارز"],
+        ["⏱ انتخاب تایم فریم"],
+        ["⬅️ بازگشت"]
+    ],
+    resize_keyboard=True
+)
+
+
+COIN_MENU = ReplyKeyboardMarkup(
+    [
+        ["BTCUSDT", "ETHUSDT"],
+        ["BNBUSDT", "SOLUSDT"],
+        ["XRPUSDT", "DOGEUSDT"],
+        ["ADAUSDT", "TRXUSDT"],
+        ["⬅️ بازگشت"]
+    ],
+    resize_keyboard=True
+)
+
+
+TIMEFRAME_MENU = ReplyKeyboardMarkup(
+    [
+        ["5m", "15m"],
+        ["1h", "4h"],
+        ["1d"],
+        ["⬅️ بازگشت"]
+    ],
+    resize_keyboard=True
+)
+
+
+def get_user_symbol(chat_id):
+
+    data = get_user_settings(chat_id)
+
+    return data.get(
+        "symbol",
+        "BTCUSDT"
+    )
+
+
+def get_user_timeframe(chat_id):
+
+    data = get_user_settings(chat_id)
+
+    return data.get(
+        "timeframe",
+        "1h"
+    )
 
 
 async def start(
@@ -59,204 +139,369 @@ async def start(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
+    register_user(
+        update.effective_chat.id
+    )
+
     await update.message.reply_text(
         """
 🚀 به ربات تحلیل بازار خوش آمدید
 
-━━━━━━━━━━━━━━
+✅ قیمت لحظه‌ای
 
-✅ قیمت BTC
-✅ قیمت ETH
+✅ RSI
 
-✅ RSI BTC
-✅ RSI ETH
+✅ روند EMA
 
-✅ تارگت قیمتی
-✅ تارگت RSI
+✅ کراس EMA
+
+✅ واگرایی RSI
+
+✅ خلاصه بازار
 
 ✅ سیگنال VIP
 
-━━━━━━━━━━━━━━
+✅ تارگت قیمتی
+
+✅ تارگت RSI
 
 🟢 ربات فعال است
         """,
-        reply_markup=main_menu
+        reply_markup=MAIN_MENU
     )
 
 
-async def messages(
+async def handle_message(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
 
     text = update.message.text
 
+    chat_id = update.effective_chat.id
+
+    symbol = get_user_symbol(
+        chat_id
+    )
+
+    timeframe = get_user_timeframe(
+        chat_id
+    )
+
     if text == "🚀 شروع ربات":
 
-        await start(update, context)
+        await start(
+            update,
+            context
+        )
 
-    elif text == "💰 قیمت BTC":
-
-        price = get_price("bitcoin")
-
-        if price:
-
-            await update.message.reply_text(
-                f"""
-💰 قیمت بیت کوین
-
-{price:,.2f} USD
-                """
-            )
-
-        else:
-
-            await update.message.reply_text(
-                "❌ خطا در دریافت قیمت"
-            )
-
-    elif text == "💰 قیمت ETH":
-
-        price = get_price("ethereum")
-
-        if price:
-
-            await update.message.reply_text(
-                f"""
-💰 قیمت اتریوم
-
-{price:,.2f} USD
-                """
-            )
-
-        else:
-
-            await update.message.reply_text(
-                "❌ خطا در دریافت قیمت"
-            )
-
-    elif text == "📈 RSI BTC":
-
-        rsi = get_rsi("bitcoin")
-
-        if rsi:
-
-            status = "خنثی"
-
-            if rsi > 70:
-                status = "اشباع خرید 🔥"
-
-            elif rsi < 30:
-                status = "اشباع فروش 🟢"
-
-            await update.message.reply_text(
-                f"""
-📈 RSI بیت کوین
-
-RSI:
-{rsi}
-
-وضعیت:
-{status}
-                """
-            )
-
-        else:
-
-            await update.message.reply_text(
-                "❌ خطا در محاسبه RSI"
-            )
-
-    elif text == "📈 RSI ETH":
-
-        rsi = get_rsi("ethereum")
-
-        if rsi:
-
-            status = "خنثی"
-
-            if rsi > 70:
-                status = "اشباع خرید 🔥"
-
-            elif rsi < 30:
-                status = "اشباع فروش 🟢"
-
-            await update.message.reply_text(
-                f"""
-📈 RSI اتریوم
-
-RSI:
-{rsi}
-
-وضعیت:
-{status}
-                """
-            )
-
-        else:
-
-            await update.message.reply_text(
-                "❌ خطا در محاسبه RSI"
-            )
-
-    elif text == "🎯 تارگت قیمتی":
-
-        price = get_price("bitcoin")
-
-        if price:
-
-            target = price * 1.03
-
-            await update.message.reply_text(
-                f"""
-🎯 تارگت قیمتی BTC
-
-قیمت فعلی:
-{price:,.2f}
-
-تارگت:
-{target:,.2f}
-                """
-            )
-
-    elif text == "🎯 تارگت RSI":
+    elif text == "⚙️ تنظیمات":
 
         await update.message.reply_text(
-            """
-🎯 تارگت RSI
+            f"""
+⚙️ تنظیمات فعلی
 
-هدف RSI:
+🪙 ارز:
+{symbol}
 
-70
+⏱ تایم فریم:
+{timeframe}
+            """,
+            reply_markup=SETTINGS_MENU
+        )
+
+    elif text == "🪙 انتخاب ارز":
+
+        await update.message.reply_text(
+            "ارز مورد نظر را انتخاب کنید",
+            reply_markup=COIN_MENU
+        )
+
+    elif text in COINS:
+
+        set_symbol(
+            chat_id,
+            text
+        )
+
+        await update.message.reply_text(
+            f"""
+✅ ارز انتخاب شد
+
+{text}
+            """,
+            reply_markup=SETTINGS_MENU
+        )
+
+    elif text == "⏱ انتخاب تایم فریم":
+
+        await update.message.reply_text(
+            "تایم فریم را انتخاب کنید",
+            reply_markup=TIMEFRAME_MENU
+        )
+
+    elif text in TIMEFRAMES:
+
+        set_timeframe(
+            chat_id,
+            text
+        )
+
+        await update.message.reply_text(
+            f"""
+✅ تایم فریم انتخاب شد
+
+{text}
+            """,
+            reply_markup=SETTINGS_MENU
+        )
+
+    elif text == "⬅️ بازگشت":
+
+        await update.message.reply_text(
+            "بازگشت به منوی اصلی",
+            reply_markup=MAIN_MENU
+        )
+
+    elif text == "💰 قیمت لحظه‌ای":
+
+        price = get_price(
+            symbol
+        )
+
+        if not price:
+
+            await update.message.reply_text(
+                "❌ خطا در دریافت قیمت"
+            )
+
+            return
+
+        await update.message.reply_text(
+            f"""
+💰 قیمت لحظه‌ای
+
+نماد:
+{symbol}
+
+قیمت:
+{price:,.4f}
+
+تایم فریم:
+{timeframe}
             """
+        )
+
+    elif text == "📈 RSI":
+
+        rsi = get_rsi(
+            symbol,
+            timeframe
+        )
+
+        if rsi is None:
+
+            await update.message.reply_text(
+                "❌ خطا در محاسبه RSI"
+            )
+
+            return
+
+        status = "خنثی"
+
+        if rsi > 70:
+            status = "اشباع خرید 🔥"
+
+        elif rsi < 30:
+            status = "اشباع فروش 🟢"
+
+        await update.message.reply_text(
+            f"""
+📈 RSI
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+RSI:
+{rsi}
+
+وضعیت:
+{status}
+            """
+        )
+    elif text == "⚡ روند EMA":
+
+        trend = get_ema_signal(
+            symbol,
+            timeframe
+        )
+
+        await update.message.reply_text(
+            f"""
+⚡ روند EMA
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+وضعیت:
+{trend}
+            """
+        )
+
+    elif text == "⚡ کراس EMA":
+
+        cross = get_ema_cross(
+            symbol,
+            timeframe
+        )
+
+        if not cross:
+
+            cross = "کراسی مشاهده نشد"
+
+        await update.message.reply_text(
+            f"""
+⚡ کراس EMA
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+نتیجه:
+{cross}
+            """
+        )
+
+    elif text == "📉 واگرایی RSI":
+
+        divergence = get_divergence(
+            symbol,
+            timeframe
+        )
+
+        if not divergence:
+
+            divergence = "واگرایی مشاهده نشد"
+
+        await update.message.reply_text(
+            f"""
+📉 واگرایی RSI
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+نتیجه:
+{divergence}
+            """
+        )
+
+    elif text == "📊 خلاصه بازار":
+
+        await update.message.reply_text(
+            format_market_summary()
         )
 
     elif text == "🔥 سیگنال VIP":
 
-        price = get_price("bitcoin")
+        signal = get_best_signal()
 
-        if price:
+        await update.message.reply_text(
+            format_vip_signal(
+                signal
+            )
+        )
 
-            take_profit = price * 1.03
-            stop_loss = price * 0.98
+    elif text == "🎯 تارگت قیمتی":
+
+        price = get_price(
+            symbol
+        )
+
+        if not price:
 
             await update.message.reply_text(
-                f"""
-🔥 سیگنال VIP
+                "❌ خطا در دریافت قیمت"
+            )
+
+            return
+
+        target_up = round(
+            price * 1.03,
+            4
+        )
+
+        target_down = round(
+            price * 0.97,
+            4
+        )
+
+        await update.message.reply_text(
+            f"""
+🎯 تارگت قیمتی
 
 نماد:
-BTC
+{symbol}
 
-ورود:
-{price:,.2f}
+تایم فریم:
+{timeframe}
 
-حد سود:
-{take_profit:,.2f}
+قیمت فعلی:
+{price}
 
-حد ضرر:
-{stop_loss:,.2f}
-                """
+تارگت صعودی:
+{target_up}
+
+تارگت نزولی:
+{target_down}
+            """
+        )
+
+    elif text == "🎯 تارگت RSI":
+
+        rsi = get_rsi(
+            symbol,
+            timeframe
+        )
+
+        if rsi is None:
+
+            await update.message.reply_text(
+                "❌ خطا در محاسبه RSI"
             )
+
+            return
+
+        await update.message.reply_text(
+            f"""
+🎯 تارگت RSI
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+RSI فعلی:
+{rsi}
+
+هدف خرید:
+30
+
+هدف فروش:
+70
+            """
+        )
 
     elif text == "🩺 سلامت ربات":
 
@@ -265,14 +510,34 @@ BTC
 🩺 سلامت ربات
 
 🟢 ربات فعال است
+
 🟢 تلگرام متصل است
-🟢 CoinGecko متصل است
-🟢 سرور فعال است
+
+🟢 Bybit متصل است
+
+🟢 اسکنر فعال است
+
+🟢 هشدار VIP فعال است
             """
         )
 
+    else:
 
-async def run_bot():
+        await update.message.reply_text(
+            "دستور نامعتبر است"
+        )
+
+
+async def startup_message(
+    context
+):
+
+    print(
+        "🔥 Scanner Running"
+    )
+
+
+async def main():
 
     app = (
         ApplicationBuilder()
@@ -290,26 +555,38 @@ async def run_bot():
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
-            messages
+            handle_message
         )
+    )
+
+    app.job_queue.run_repeating(
+        send_vip_alerts,
+        interval=SCANNER_INTERVAL,
+        first=60
+    )
+
+    app.job_queue.run_once(
+        startup_message,
+        when=5
     )
 
     print("🚀 Bot Running")
 
     await app.initialize()
+
     await app.start()
+
     await app.updater.start_polling()
 
     while True:
-        await asyncio.sleep(3600)
 
-
-def main():
-
-    asyncio.run(
-        run_bot()
-    )
+        await asyncio.sleep(
+            3600
+        )
 
 
 if __name__ == "__main__":
-    main()
+
+    asyncio.run(
+        main()
+    )
