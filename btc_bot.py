@@ -1,5 +1,6 @@
 import sys
 import telegram
+import asyncio
 
 print("================================")
 print("PYTHON VERSION:")
@@ -38,26 +39,36 @@ main_menu = ReplyKeyboardMarkup(
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     await update.message.reply_text(
         "🚀 ربات فعال است",
         reply_markup=main_menu
     )
 
 
-async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def messages(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
     await update.message.reply_text(
         f"دکمه انتخاب شده:\n{update.message.text}"
     )
 
 
-def main():
+async def run_bot():
 
-    app = ApplicationBuilder().token(
-        BOT_TOKEN
-    ).build()
+    app = (
+        ApplicationBuilder()
+        .token(BOT_TOKEN)
+        .build()
+    )
 
     app.add_handler(
-        CommandHandler("start", start)
+        CommandHandler(
+            "start",
+            start
+        )
     )
 
     app.add_handler(
@@ -69,8 +80,18 @@ def main():
 
     print("🚀 Bot Running")
 
-    app.run_polling(
-        drop_pending_updates=True
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
+    while True:
+        await asyncio.sleep(3600)
+
+
+def main():
+
+    asyncio.run(
+        run_bot()
     )
 
 
