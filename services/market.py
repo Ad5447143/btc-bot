@@ -1,32 +1,22 @@
 import requests
 
-COIN_MAP = {
-    "BTCUSDT": "bitcoin",
-    "ETHUSDT": "ethereum",
-    "BNBUSDT": "binancecoin",
-    "SOLUSDT": "solana",
-    "XRPUSDT": "ripple",
-    "DOGEUSDT": "dogecoin",
-    "ADAUSDT": "cardano",
-    "TRXUSDT": "tron"
-}
 
-def get_price(symbol):
+def get_price(symbol="bitcoin"):
+
+    url = (
+        "https://api.coingecko.com/api/v3/simple/price"
+        f"?ids={symbol}&vs_currencies=usd"
+    )
+
     try:
-        coin_id = COIN_MAP.get(symbol)
 
-        if not coin_id:
-            return None
+        data = requests.get(
+            url,
+            timeout=10
+        ).json()
 
-        url = (
-            "https://api.coingecko.com/api/v3/simple/price"
-            f"?ids={coin_id}&vs_currencies=usd"
-        )
+        return data[symbol]["usd"]
 
-        data = requests.get(url, timeout=10).json()
+    except:
 
-        return data[coin_id]["usd"]
-
-    except Exception as e:
-        print("Market Error:", e)
         return None
