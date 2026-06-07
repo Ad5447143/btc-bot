@@ -673,53 +673,38 @@ async def main():
         )
     )
 
+    app.job_queue.run_once(
+        startup_message,
+        when=5
+    )
+
     app.job_queue.run_repeating(
         send_vip_alerts,
-        interval=SCANNER_INTERVAL,
+        interval=300,
         first=60
     )
 
-   app.job_queue.run_once(
-    startup_message,
-    when=5
-)
-
-app.job_queue.run_repeating(
-    send_vip_alerts,
-    interval=300,
-    first=60
-)
-
-app.job_queue.run_repeating(
-    send_auto_alerts,
-    interval=300,
-    first=120
-)
-
-app.job_queue.run_repeating(
-    send_target_alerts,
-    interval=300,
-    first=180
-)
-
-print("🚀 Bot Running")
-
-await app.initialize()
-
-await app.start()
-
-await app.updater.start_polling()
-
-while True:
-
-    await asyncio.sleep(
-        3600
+    app.job_queue.run_repeating(
+        send_auto_alerts,
+        interval=300,
+        first=120
     )
+
+    app.job_queue.run_repeating(
+        send_target_alerts,
+        interval=300,
+        first=180
+    )
+
+    print("🚀 Bot Running")
+
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
+    while True:
+        await asyncio.sleep(3600)
 
 
 if __name__ == "__main__":
-
-    asyncio.run(
-        main()
-    )
-        main()  
+    asyncio.run(main())
