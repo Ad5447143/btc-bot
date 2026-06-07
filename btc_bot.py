@@ -16,8 +16,11 @@ from telegram.ext import (
 )
 
 from config import BOT_TOKEN
-from services.market import get_price
 
+from services.market import (
+    get_price,
+    get_rsi
+)
 
 print("================================")
 print("PYTHON VERSION:")
@@ -62,8 +65,8 @@ async def start(
 
 ━━━━━━━━━━━━━━
 
-✅ قیمت لحظه‌ای BTC
-✅ قیمت لحظه‌ای ETH
+✅ قیمت BTC
+✅ قیمت ETH
 
 ✅ RSI BTC
 ✅ RSI ETH
@@ -109,7 +112,7 @@ async def messages(
         else:
 
             await update.message.reply_text(
-                "❌ دریافت قیمت ناموفق بود."
+                "❌ خطا در دریافت قیمت"
             )
 
     elif text == "💰 قیمت ETH":
@@ -129,43 +132,87 @@ async def messages(
         else:
 
             await update.message.reply_text(
-                "❌ دریافت قیمت ناموفق بود."
+                "❌ خطا در دریافت قیمت"
             )
 
     elif text == "📈 RSI BTC":
 
-        await update.message.reply_text(
-            """
+        rsi = get_rsi("bitcoin")
+
+        if rsi:
+
+            status = "خنثی"
+
+            if rsi > 70:
+                status = "اشباع خرید 🔥"
+
+            elif rsi < 30:
+                status = "اشباع فروش 🟢"
+
+            await update.message.reply_text(
+                f"""
 📈 RSI بیت کوین
 
-در حال تکمیل موتور RSI...
-            """
-        )
+RSI:
+{rsi}
+
+وضعیت:
+{status}
+                """
+            )
+
+        else:
+
+            await update.message.reply_text(
+                "❌ خطا در محاسبه RSI"
+            )
 
     elif text == "📈 RSI ETH":
 
-        await update.message.reply_text(
-            """
+        rsi = get_rsi("ethereum")
+
+        if rsi:
+
+            status = "خنثی"
+
+            if rsi > 70:
+                status = "اشباع خرید 🔥"
+
+            elif rsi < 30:
+                status = "اشباع فروش 🟢"
+
+            await update.message.reply_text(
+                f"""
 📈 RSI اتریوم
 
-در حال تکمیل موتور RSI...
-            """
-        )
+RSI:
+{rsi}
+
+وضعیت:
+{status}
+                """
+            )
+
+        else:
+
+            await update.message.reply_text(
+                "❌ خطا در محاسبه RSI"
+            )
 
     elif text == "🎯 تارگت قیمتی":
 
-        btc = get_price("bitcoin")
+        price = get_price("bitcoin")
 
-        if btc:
+        if price:
 
-            target = btc * 1.03
+            target = price * 1.03
 
             await update.message.reply_text(
                 f"""
 🎯 تارگت قیمتی BTC
 
 قیمت فعلی:
-{btc:,.2f}
+{price:,.2f}
 
 تارگت:
 {target:,.2f}
@@ -178,32 +225,36 @@ async def messages(
             """
 🎯 تارگت RSI
 
-هدف فعلی:
+هدف RSI:
 
-RSI → 70
+70
             """
         )
 
     elif text == "🔥 سیگنال VIP":
 
-        btc = get_price("bitcoin")
+        price = get_price("bitcoin")
 
-        if btc:
+        if price:
+
+            take_profit = price * 1.03
+            stop_loss = price * 0.98
 
             await update.message.reply_text(
                 f"""
 🔥 سیگنال VIP
 
-نماد: BTC
+نماد:
+BTC
 
 ورود:
-{btc:,.2f}
+{price:,.2f}
 
 حد سود:
-{btc*1.03:,.2f}
+{take_profit:,.2f}
 
 حد ضرر:
-{btc*0.98:,.2f}
+{stop_loss:,.2f}
                 """
             )
 
@@ -214,9 +265,9 @@ RSI → 70
 🩺 سلامت ربات
 
 🟢 ربات فعال است
-🟢 سرور فعال است
-🟢 CoinGecko متصل است
 🟢 تلگرام متصل است
+🟢 CoinGecko متصل است
+🟢 سرور فعال است
             """
         )
 
