@@ -7,7 +7,14 @@
     "rsi": true,
     "ema": true,
     "divergence": true,
-    "price_target": true,
-    "rsi_target": true
+
+    "price_target": 120000,
+    "rsi_target": 70,
+
+    "last_rsi_alert": false,
+    "last_price_alert": false,
+    "last_ema_alert": "",
+    "last_divergence_alert": "",
+    "last_vip_signal": ""
   }
 }
