@@ -5,6 +5,12 @@ from services.scanner import (
     get_vip_signals
 )
 
+from services.market import (
+    get_rsi,
+    get_ema_cross,
+    get_divergence
+)
+
 USERS_FILE = "storage/users.json"
 
 
@@ -31,11 +37,6 @@ def load_users():
 
 
 def save_users(data):
-
-    os.makedirs(
-        "storage",
-        exist_ok=True
-    )
 
     with open(
         USERS_FILE,
@@ -81,7 +82,9 @@ def register_user(chat_id):
         save_users(users)
 
 
-def get_user_settings(chat_id):
+def get_user_settings(
+    chat_id
+):
 
     users = load_users()
 
@@ -102,7 +105,9 @@ def set_symbol(
 
     if chat_id not in users:
 
-        register_user(chat_id)
+        register_user(
+            chat_id
+        )
 
         users = load_users()
 
@@ -122,7 +127,9 @@ def set_timeframe(
 
     if chat_id not in users:
 
-        register_user(chat_id)
+        register_user(
+            chat_id
+        )
 
         users = load_users()
 
@@ -149,14 +156,18 @@ def toggle_alert(
         True
     )
 
-    users[chat_id][alert_name] = not current
+    users[chat_id][alert_name] = (
+        not current
+    )
 
     save_users(users)
 
     return users[chat_id][alert_name]
 
 
-async def send_vip_alerts(context):
+async def send_vip_alerts(
+    context
+):
 
     users = load_users()
 
@@ -173,52 +184,207 @@ async def send_vip_alerts(context):
         text = f"""
 🔥 سیگنال VIP
 
-نماد:
+━━━━━━━━━━━━━━
+
+🪙 نماد:
 {signal['symbol']}
 
-تایم فریم:
+⏱ تایم فریم:
 {signal['timeframe']}
 
-قیمت:
+💰 قیمت:
 {signal['price']}
 
-RSI:
+📈 RSI:
 {signal['rsi']}
 
-EMA:
+⚡ روند EMA:
 {signal['ema_signal']}
 
-کراس EMA:
+⚡ کراس EMA:
 {signal['ema_cross']}
 
-واگرایی:
+📉 واگرایی:
 {signal['divergence']}
 
-امتیاز:
+🎯 امتیاز:
 {signal['score']}
 
-سیگنال:
+🚀 نتیجه:
 {signal['signal']}
 """
 
-        for chat_id, settings in users.items():
+        for chat_id in users:
 
-            if not settings.get(
+            if users[chat_id].get(
                 "vip",
                 True
             ):
-                continue
 
-            try:
+                try:
 
-                await context.bot.send_message(
-                    chat_id=int(chat_id),
-                    text=text
+                    await context.bot.send_message(
+                        chat_id=int(chat_id),
+                        text=text
+                    )
+
+                except Exception as e:
+
+                    print(
+                        "VIP ALERT ERROR:",
+                        e
+                    )
+
+
+async def send_auto_alerts(
+    context
+):
+
+    users = load_users()
+
+    for chat_id in users:
+
+        try:
+
+            symbol = users[
+                chat_id
+            ].get(
+                "symbol",
+                "BTCUSDT"
+            )
+
+            timeframe = users[
+                chat_id
+            ].get(
+                "timeframe",
+                "1h"
+            )
+
+            # RSI
+
+            if users[
+                chat_id
+            ].get(
+                "rsi",
+                True
+            ):
+
+                rsi = get_rsi(
+                    symbol,
+                    timeframe
                 )
 
-            except Exception as e:
+                if rsi:
 
-                print(
-                    "VIP ALERT ERROR:",
-                    e
+                    if rsi >= 70:
+
+                        await context.bot.send_message(
+                            chat_id=int(chat_id),
+                            text=f"""
+🔥 هشدار RSI
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+RSI:
+{rsi}
+
+وضعیت:
+اشباع خرید
+"""
+                        )
+
+                    elif rsi <= 30:
+
+                        await context.bot.send_message(
+                            chat_id=int(chat_id),
+                            text=f"""
+🟢 هشدار RSI
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+RSI:
+{rsi}
+
+وضعیت:
+اشباع فروش
+"""
+                        )
+
+            # EMA CROSS
+
+            if users[
+                chat_id
+            ].get(
+                "ema",
+                True
+            ):
+
+                cross = get_ema_cross(
+                    symbol,
+                    timeframe
                 )
+
+                if cross:
+
+                    await context.bot.send_message(
+                        chat_id=int(chat_id),
+                        text=f"""
+⚡ هشدار کراس EMA
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+نتیجه:
+{cross}
+"""
+                    )
+
+            # DIVERGENCE
+
+            if users[
+                chat_id
+            ].get(
+                "divergence",
+                True
+            ):
+
+                divergence = get_divergence(
+                    symbol,
+                    timeframe
+                )
+
+                if divergence:
+
+                    await context.bot.send_message(
+                        chat_id=int(chat_id),
+                        text=f"""
+📉 هشدار واگرایی
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+نتیجه:
+{divergence}
+"""
+                    )
+
+        except Exception as e:
+
+            print(
+                "AUTO ALERT ERROR:",
+                e
+            )
