@@ -42,7 +42,10 @@ from services.alerts import (
     set_timeframe,
     send_vip_alerts
 )
-
+from services.alerts import (
+    send_vip_alerts,
+    send_auto_alerts
+)
 
 USERS_FILE = "storage/users.json"
 
