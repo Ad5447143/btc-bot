@@ -741,6 +741,5 @@ app.job_queue.run_repeating(
 
 if __name__ == "__main__":
 
-    asyncio.run(
-        main()
-    )
+    asyncio.run()
+        main()  
