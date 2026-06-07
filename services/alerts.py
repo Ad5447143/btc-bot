@@ -1,3 +1,13 @@
+LAST_PRICE_ALERTS = {}
+LAST_RSI_ALERTS = {}
+
+PRICE_TARGETS = {
+    "BTCUSDT": 120000,
+    "ETHUSDT": 5000,
+    "SOLUSDT": 300
+}
+
+RSI_TARGET = 70
 import json
 import os
 
