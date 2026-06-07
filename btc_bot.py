@@ -1,7 +1,118 @@
 import asyncio
 import json
 import os
+from services.market import (
+    get_price,
+    get_rsi
+)
 
+async def send_target_alerts(context):
+
+    global LAST_PRICE_ALERTS
+    global LAST_RSI_ALERTS
+
+    users = load_users()
+
+    for chat_id in users:
+
+        try:
+
+            symbol = users[chat_id].get(
+                "symbol",
+                "BTCUSDT"
+            )
+
+            timeframe = users[chat_id].get(
+                "timeframe",
+                "1h"
+            )
+
+            # PRICE TARGET
+
+            if symbol in PRICE_TARGETS:
+
+                price = get_price(symbol)
+
+                target = PRICE_TARGETS[symbol]
+
+                if price >= target:
+
+                    if not LAST_PRICE_ALERTS.get(symbol):
+
+                        await context.bot.send_message(
+                            chat_id=int(chat_id),
+                            text=f"""
+🎯 هشدار تارگت قیمت
+
+نماد:
+{symbol}
+
+قیمت فعلی:
+{price}
+
+تارگت:
+{target}
+
+✅ هدف قیمتی فعال شد
+"""
+                        )
+
+                        LAST_PRICE_ALERTS[symbol] = True
+
+                else:
+
+                    LAST_PRICE_ALERTS[symbol] = False
+
+            # RSI TARGET
+
+            rsi = get_rsi(
+                symbol,
+                timeframe
+            )
+
+            if rsi:
+
+                if rsi >= RSI_TARGET:
+
+                    key = f"{symbol}_{timeframe}"
+
+                    if not LAST_RSI_ALERTS.get(key):
+
+                        await context.bot.send_message(
+                            chat_id=int(chat_id),
+                            text=f"""
+📈 هشدار تارگت RSI
+
+نماد:
+{symbol}
+
+تایم فریم:
+{timeframe}
+
+RSI:
+{rsi}
+
+هدف:
+{RSI_TARGET}
+
+✅ هدف RSI فعال شد
+"""
+                        )
+
+                        LAST_RSI_ALERTS[key] = True
+
+                else:
+
+                    key = f"{symbol}_{timeframe}"
+
+                    LAST_RSI_ALERTS[key] = False
+
+        except Exception as e:
+
+            print(
+                "TARGET ALERT ERROR:",
+                e
+            )
 from telegram import (
     Update,
     ReplyKeyboardMarkup
